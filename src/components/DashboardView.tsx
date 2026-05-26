@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { BarChart3, Building2, Flame, Lightbulb, Trophy, UsersRound, Wind } from "lucide-react";
+import { BarChart3, Building2, Flame, HelpCircle, Lightbulb, Trophy, UsersRound, Wind } from "lucide-react";
 import { BarChart, LineChart } from "@/components/Charts";
 import { ExposureMap } from "@/components/ExposureMap";
 import { OverviewRankingTable } from "@/components/OverviewRankingTable";
@@ -15,8 +15,8 @@ import {
 
 const OVERVIEW_LAYERS = {
   no2: true,
-  fire: true,
-  population: true
+  fire: false,
+  population: false
 };
 
 export function DashboardView() {
@@ -34,13 +34,7 @@ export function DashboardView() {
       <OverviewKpis />
 
       <section className="dashboard-grid overview-main-grid">
-        <ExposureMap
-          activeLayers={OVERVIEW_LAYERS}
-          compact
-          filters={filters}
-          selectedCountryId={filters.countryId}
-          onSelectCountry={selectCountry}
-        />
+        <OverviewMapCard filters={filters} selectedCountryId={filters.countryId} onSelectCountry={selectCountry} />
         <OverviewRankingTable />
       </section>
 
@@ -75,6 +69,48 @@ export function DashboardView() {
         </section>
       </footer>
     </div>
+  );
+}
+
+function OverviewMapCard({
+  filters,
+  selectedCountryId,
+  onSelectCountry
+}: {
+  filters: Parameters<typeof ExposureMap>[0]["filters"];
+  selectedCountryId: string;
+  onSelectCountry: (countryId: string) => void;
+}) {
+  return (
+    <article className="tropomi-map-card">
+      <header className="tropomi-map-header">
+        <span>
+          Tropospheric NO{"\u2082"} column (TROPOMI)
+          <HelpCircle size={15} aria-hidden />
+        </span>
+        <div className="map-selectors" aria-label="Map view controls">
+          <select aria-label="Map statistic" defaultValue="annual">
+            <option value="annual">Annual Mean</option>
+          </select>
+          <select aria-label="Map year" defaultValue={filters.year}>
+            <option value={filters.year}>{filters.year}</option>
+          </select>
+          <button type="button" aria-label="Map information">
+            ?
+          </button>
+        </div>
+      </header>
+      <div className="tropomi-map-body">
+        <ExposureMap
+          activeLayers={OVERVIEW_LAYERS}
+          compact
+          filters={filters}
+          legend="column"
+          selectedCountryId={selectedCountryId}
+          onSelectCountry={onSelectCountry}
+        />
+      </div>
+    </article>
   );
 }
 

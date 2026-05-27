@@ -78,9 +78,9 @@ const OVERVIEW_NO2_VIEW_STATE = {
 
 const MOBILE_OVERVIEW_NO2_VIEW_STATE = {
   ...INITIAL_VIEW_STATE,
-  longitude: -1.1,
-  latitude: 10.25,
-  zoom: 4.18,
+  longitude: 0.45,
+  latitude: 7,
+  zoom: 4.3,
 };
 
 const FIRE_ACTIVITY_VIEW_STATE = {

@@ -1229,7 +1229,7 @@ a {
 
 .observatory-footer section > svg {
   grid-row: 1 / span 2;
-  color: #102b3e;
+  color: #eff8fc;
 }
 
 .observatory-footer section > div,
@@ -2041,6 +2041,7 @@ a {
   .observatory-footer section > svg {
     width: 24px;
     height: 24px;
+    color: #102b3e;
   }
 
   .observatory-footer h2 {
@@ -2554,6 +2555,17 @@ a {
     left: 8px;
     width: calc(100% - 16px);
     padding: 8px 9px;
+  }
+
+  .map-panel.compact .maplibregl-ctrl-bottom-right,
+  .map-panel.compact .mapboxgl-ctrl-bottom-right {
+    right: 8px;
+    bottom: 78px;
+  }
+
+  .map-panel.compact .maplibregl-ctrl-bottom-left,
+  .map-panel.compact .mapboxgl-ctrl-bottom-left {
+    bottom: 78px;
   }
 
   .map-legend {

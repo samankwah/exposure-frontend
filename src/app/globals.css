@@ -2134,6 +2134,29 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .selector-card {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+    gap: 8px;
+  }
+
+  .selector-card > .rail-label {
+    grid-column: 1 / -1;
+  }
+
+  .selector-card > select,
+  .selector-card .year-grid label {
+    min-width: 0;
+  }
+
+  .selector-card .year-grid {
+    display: contents;
+  }
+
+  .selector-card .apply-button {
+    grid-column: 1 / -1;
+  }
+
   .rail-nav-group,
   .about-box,
   .rail-source {
@@ -2430,7 +2453,7 @@ a {
   }
 
   .map-selectors {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px;
   }
 
   .map-selectors button {

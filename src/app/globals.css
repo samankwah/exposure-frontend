@@ -1417,7 +1417,7 @@ a {
 
 .population-row {
   display: grid;
-  grid-template-columns: 106px minmax(132px, 1fr) 166px;
+  grid-template-columns: 106px minmax(170px, 1fr) minmax(54px, max-content);
   gap: 8px;
   align-items: center;
   color: #122333;
@@ -1453,21 +1453,33 @@ a {
 }
 
 .no2-bar-cell {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 32px;
-  gap: 7px;
-  align-items: center;
+  position: relative;
+  display: block;
+  min-width: 0;
 }
 
 .no2-bar-cell i {
+  display: block;
+  width: var(--bar-width, 0%);
   height: 10px;
   border-radius: 999px;
   background: linear-gradient(90deg, #ffd958, #ff972c, #e82222);
 }
 
 .no2-bar-cell b {
+  position: absolute;
+  top: 50%;
+  left: clamp(17px, var(--bar-width, 0%), calc(100% - 17px));
+  transform: translate(-50%, -50%);
+  width: 30px;
+  padding: 1px 2px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.84);
+  color: #102232;
+  font-size: 0.58rem;
   font-weight: 500;
-  text-align: right;
+  line-height: 1;
+  text-align: center;
 }
 
 .population-row span:last-child {
@@ -2103,8 +2115,7 @@ a {
   }
 
   .download-button {
-    justify-self: stretch;
-    margin-bottom: 8px;
+    display: none;
   }
 
   .topbar-brand {
@@ -2238,7 +2249,7 @@ a {
   }
 
   .population-row {
-    grid-template-columns: 92px minmax(96px, 1fr) 104px;
+    grid-template-columns: 92px minmax(126px, 1fr) 64px;
   }
 
 }
@@ -2370,7 +2381,7 @@ a {
   }
 
   .population-row {
-    grid-template-columns: 76px minmax(78px, 1fr) 78px;
+    grid-template-columns: 76px minmax(104px, 1fr) 54px;
     gap: 5px;
     font-size: 0.58rem;
   }
@@ -2380,8 +2391,13 @@ a {
   }
 
   .no2-bar-cell {
-    grid-template-columns: minmax(0, 1fr) 28px;
-    gap: 5px;
+    min-width: 0;
+  }
+
+  .no2-bar-cell b {
+    left: clamp(15px, var(--bar-width, 0%), calc(100% - 15px));
+    width: 27px;
+    font-size: 0.54rem;
   }
 
   .target-fire-footer {
@@ -2429,7 +2445,7 @@ a {
   }
 
   .population-row {
-    grid-template-columns: 70px minmax(70px, 1fr) 68px;
+    grid-template-columns: 70px minmax(92px, 1fr) 46px;
     font-size: 0.54rem;
   }
 
@@ -2449,14 +2465,6 @@ a {
   .target-kpi-card em {
     font-size: 0.58rem;
   }
-}
-
-.overview-main-grid {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.population-table-card {
-  display: none;
 }
 
 @media print {

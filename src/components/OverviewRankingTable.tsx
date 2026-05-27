@@ -1,5 +1,7 @@
 "use client";
 
+import type { CSSProperties } from "react";
+
 const rows = [
   { country: "Nigeria", no2: 4.72, population: 85.3 },
   { country: "Ghana", no2: 3.31, population: 18.7 },
@@ -19,6 +21,8 @@ const rows = [
   { country: "The Gambia", no2: 0.98, population: 1.3 },
   { country: "Chad", no2: 0.71, population: 0.7 }
 ];
+
+type BarStyle = CSSProperties & Record<"--bar-width", string>;
 
 export function OverviewRankingTable() {
   const max = rows[0].no2;
@@ -42,16 +46,21 @@ export function OverviewRankingTable() {
             <small>Hotspot Zones (Millions)</small>
           </span>
         </div>
-        {rows.map((row) => (
-          <div className="population-row" key={row.country} role="row">
-            <span role="cell">{row.country}</span>
-            <span className="no2-bar-cell" role="cell">
-              <i style={{ width: `${Math.max(8, (row.no2 / max) * 100)}%` }} />
-              <b>{row.no2.toFixed(2)}</b>
-            </span>
-            <span role="cell">{row.population.toFixed(1)}</span>
-          </div>
-        ))}
+        {rows.map((row) => {
+          const barWidth = `${Math.max(8, (row.no2 / max) * 100)}%`;
+          const barStyle = { "--bar-width": barWidth } as BarStyle;
+
+          return (
+            <div className="population-row" key={row.country} role="row">
+              <span role="cell">{row.country}</span>
+              <span className="no2-bar-cell" role="cell" style={barStyle}>
+                <i />
+                <b>{row.no2.toFixed(2)}</b>
+              </span>
+              <span role="cell">{row.population.toFixed(1)}</span>
+            </div>
+          );
+        })}
       </div>
       <footer>High-column hotspot zones = Top 25% highest NO{"\u2082"} column areas</footer>
     </article>

@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
+import type { HighchartsReactRefObject } from "highcharts-react-official";
 import type { TrendPoint } from "@/types/exposure";
 
 type MetricKey = "no2" | "fireCount" | "exposure" | "dry" | "wet";
@@ -24,9 +25,76 @@ const chartColors = {
   secondary: "#f58220",
   green: "#2f9e44",
   grid: "#dce6eb",
+  axis: "#5b6f7c",
   text: "#243746",
   muted: "#667985"
 };
+
+const axisLine = {
+  lineColor: chartColors.axis,
+  lineWidth: 1.5,
+  tickColor: chartColors.axis,
+  tickLength: 6,
+  tickWidth: 1.5
+};
+
+const axisTitleStyle = {
+  color: chartColors.muted,
+  fontSize: "10px",
+  fontWeight: "700"
+};
+
+function ResponsiveHighcharts({ options }: { options: Highcharts.Options }) {
+  const chartRef = useRef<HighchartsReactRefObject>(null);
+
+  useEffect(() => {
+    const chart = chartRef.current?.chart;
+    const root = chartRef.current?.container.current;
+    const target = root?.parentElement;
+
+    if (!chart || !target) return;
+
+    const resizeChart = () => {
+      if (!window.matchMedia("(min-width: 701px)").matches) return;
+
+      const { height, width } = target.getBoundingClientRect();
+      if (width > 0 && height > 0) {
+        chart.setSize(Math.floor(width), Math.floor(height), false);
+      }
+    };
+
+    const animationFrame = window.requestAnimationFrame(resizeChart);
+    const resizeObserver = new ResizeObserver(resizeChart);
+    resizeObserver.observe(target);
+    window.addEventListener("resize", resizeChart);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", resizeChart);
+    };
+  }, [options]);
+
+  return (
+    <HighchartsReact
+      containerProps={{ className: "highcharts-root", style: { height: "100%", width: "100%" } }}
+      highcharts={Highcharts}
+      options={options}
+      ref={chartRef}
+    />
+  );
+}
+
+function formatChartValue(value: number) {
+  return Highcharts.numberFormat(value, 1);
+}
+
+function formatCompactChartValue(value: number | string) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return String(value);
+  if (Math.abs(numericValue) >= 1000) return `${Highcharts.numberFormat(numericValue / 1000, 1)}k`;
+  return formatChartValue(numericValue);
+}
 
 export function LineChart({
   title,
@@ -49,8 +117,8 @@ export function LineChart({
       accessibility: { enabled: false },
       chart: {
         backgroundColor: "transparent",
-        height: isOverview ? 170 : 250,
-        margin: isOverview ? [unit.trim() ? 28 : 18, 10, 34, 40] : undefined,
+        height: "100%",
+        margin: isOverview ? [unit.trim() ? 34 : 24, 12, 42, 42] : hasDualAxis ? [48, 64, 62, 58] : [46, 18, 62, 58],
         spacing: isOverview ? [0, 0, 0, 0] : [8, 8, 6, 8],
         style: { fontFamily: "Arial, Helvetica, sans-serif" },
         type: "line"
@@ -67,10 +135,12 @@ export function LineChart({
       plotOptions: {
         line: {
           dataLabels: {
+            crop: false,
             enabled: data.length <= 6,
             formatter() {
-              return Highcharts.numberFormat(Number(this.y ?? 0), 2);
+              return formatCompactChartValue(Number(this.y ?? 0));
             },
+            overflow: "allow",
             style: {
               color: chartColors.text,
               fontSize: "10px",
@@ -118,36 +188,59 @@ export function LineChart({
         borderColor: "#d9e2e7",
         borderRadius: 7,
         pointFormatter() {
-          return `<span style="color:${this.color}">\u25CF</span> ${this.series.name}: <b>${Highcharts.numberFormat(
-            Number(this.y ?? 0),
-            Number(this.y ?? 0) >= 100 ? 0 : 2
+          return `<span style="color:${this.color}">\u25CF</span> ${this.series.name}: <b>${formatCompactChartValue(
+            Number(this.y ?? 0)
           )}${unit}</b><br/>`;
         },
         shared: true
       },
       xAxis: {
+        ...axisLine,
         categories: data.map((point) => point.label),
-        lineColor: chartColors.grid,
-        tickColor: chartColors.grid,
-        labels: { style: { color: chartColors.text, fontSize: "11px" } }
+        tickmarkPlacement: "on",
+        tickPosition: "outside",
+        labels: { style: { color: chartColors.text, fontSize: "11px" } },
+        title: { margin: 10, text: "Year", style: axisTitleStyle }
       },
       yAxis: [
         {
+          ...axisLine,
           gridLineColor: chartColors.grid,
-          labels: { style: { color: chartColors.muted, fontSize: "11px" } },
+          labels: {
+            align: "right" as const,
+            formatter(this: Highcharts.AxisLabelsFormatterContextObject) {
+              return formatCompactChartValue(this.value);
+            },
+            reserveSpace: true,
+            x: -6,
+            style: { color: chartColors.muted, fontSize: "11px" }
+          },
           max: isOverview && primaryKey === "no2" && !secondaryKey ? 3 : undefined,
           min: isOverview && primaryKey === "no2" && !secondaryKey ? 1 : undefined,
           minPadding: 0.08,
           tickInterval: isOverview && primaryKey === "no2" && !secondaryKey ? 0.5 : undefined,
-          title: { text: undefined }
+          title: { margin: 10, text: primaryLabel, style: axisTitleStyle }
         },
         ...(hasDualAxis
           ? [
               {
+                ...axisLine,
                 gridLineWidth: 0,
-                labels: { style: { color: chartColors.secondary, fontSize: "11px" } },
+                labels: {
+                  align: "left" as const,
+                  formatter(this: Highcharts.AxisLabelsFormatterContextObject) {
+                    return formatCompactChartValue(this.value);
+                  },
+                  reserveSpace: true,
+                  x: 6,
+                  style: { color: chartColors.secondary, fontSize: "11px" }
+                },
                 opposite: true,
-                title: { text: secondaryLabel, style: { color: chartColors.secondary, fontSize: "10px" } }
+                title: {
+                  text: secondaryLabel,
+                  margin: 10,
+                  style: { ...axisTitleStyle, color: chartColors.secondary }
+                }
               }
             ]
           : [])
@@ -163,7 +256,7 @@ export function LineChart({
       </header>
       <div className="chart-wrap highcharts-chart-wrap">
         {unit.trim() ? <span className="chart-unit-label">{unit.trim()}</span> : null}
-        <HighchartsReact containerProps={{ className: "highcharts-root" }} highcharts={Highcharts} options={options} />
+        <ResponsiveHighcharts options={options} />
       </div>
     </article>
   );
@@ -189,8 +282,8 @@ export function MonthlyCycleChart({
       accessibility: { enabled: false },
       chart: {
         backgroundColor: "transparent",
-        height: 170,
-        margin: [30, 10, 34, 40],
+        height: "100%",
+        margin: [46, 18, 62, 58],
         spacing: [0, 0, 0, 0],
         style: { fontFamily: "Arial, Helvetica, sans-serif" },
         type: "line"
@@ -206,7 +299,7 @@ export function MonthlyCycleChart({
       },
       plotOptions: {
         line: {
-          dataLabels: { enabled: false },
+          dataLabels: { crop: false, enabled: false, overflow: "allow" },
           lineWidth: 3,
           marker: {
             enabled: true,
@@ -244,26 +337,36 @@ export function MonthlyCycleChart({
         borderColor: "#d9e2e7",
         borderRadius: 7,
         pointFormatter() {
-          return `<span style="color:${this.color}">\u25CF</span> ${this.series.name}: <b>${Highcharts.numberFormat(
-            Number(this.y ?? 0),
-            2
+          return `<span style="color:${this.color}">\u25CF</span> ${this.series.name}: <b>${formatCompactChartValue(
+            Number(this.y ?? 0)
           )}${unit}</b><br/>`;
         },
         shared: true
       },
       xAxis: {
+        ...axisLine,
         categories: data.map((point) => point.label),
-        lineColor: chartColors.grid,
-        tickColor: chartColors.grid,
-        labels: { style: { color: chartColors.text, fontSize: "11px" } }
+        tickmarkPlacement: "on",
+        tickPosition: "outside",
+        labels: { style: { color: chartColors.text, fontSize: "11px" } },
+        title: { margin: 10, text: "Month", style: axisTitleStyle }
       },
       yAxis: {
+        ...axisLine,
         gridLineColor: chartColors.grid,
-        labels: { style: { color: chartColors.muted, fontSize: "11px" } },
+        labels: {
+          align: "right" as const,
+          formatter(this: Highcharts.AxisLabelsFormatterContextObject) {
+            return formatCompactChartValue(this.value);
+          },
+          reserveSpace: true,
+          x: -6,
+          style: { color: chartColors.muted, fontSize: "11px" }
+        },
         max: 4.1,
         min: 1,
         tickInterval: 1,
-        title: { text: undefined }
+        title: { margin: 10, text: "NO2", style: axisTitleStyle }
       }
     };
   }, [data, unit]);
@@ -276,7 +379,7 @@ export function MonthlyCycleChart({
       </header>
       <div className="chart-wrap highcharts-chart-wrap">
         {unit.trim() ? <span className="chart-unit-label">{unit.trim()}</span> : null}
-        <HighchartsReact containerProps={{ className: "highcharts-root" }} highcharts={Highcharts} options={options} />
+        <ResponsiveHighcharts options={options} />
       </div>
     </article>
   );
@@ -300,8 +403,9 @@ export function BarChart({
       accessibility: { enabled: false },
       chart: {
         backgroundColor: "transparent",
-        height: 250,
-        spacing: [8, 8, 8, 8],
+        height: "100%",
+        margin: [46, 18, 62, 58],
+        spacing: [8, 4, 8, 4],
         style: { fontFamily: "Arial, Helvetica, sans-serif" },
         type: "column"
       },
@@ -331,20 +435,31 @@ export function BarChart({
         borderColor: "#d9e2e7",
         borderRadius: 7,
         pointFormatter() {
-          return `${this.series.name}: <b>${Highcharts.numberFormat(Number(this.y ?? 0), Number(this.y ?? 0) >= 100 ? 0 : 2)}</b>`;
+          return `${this.series.name}: <b>${formatCompactChartValue(Number(this.y ?? 0))}</b>`;
         }
       },
       xAxis: {
+        ...axisLine,
         categories: data.map((point) => point.label),
-        lineColor: chartColors.grid,
-        tickColor: chartColors.grid,
-        labels: { style: { color: chartColors.text, fontSize: "11px" } }
+        tickmarkPlacement: "on",
+        tickPosition: "outside",
+        labels: { style: { color: chartColors.text, fontSize: "11px" } },
+        title: { margin: 10, text: "Month", style: axisTitleStyle }
       },
       yAxis: {
+        ...axisLine,
         gridLineColor: chartColors.grid,
-        labels: { style: { color: chartColors.muted, fontSize: "11px" } },
+        labels: {
+          align: "right" as const,
+          formatter(this: Highcharts.AxisLabelsFormatterContextObject) {
+            return formatCompactChartValue(this.value);
+          },
+          reserveSpace: true,
+          x: -6,
+          style: { color: chartColors.muted, fontSize: "11px" }
+        },
         min: 0,
-        title: { text: undefined }
+        title: { margin: 10, text: label, style: axisTitleStyle }
       }
     }),
     [data, label, metricKey]
@@ -357,7 +472,7 @@ export function BarChart({
         <strong>{title}</strong>
       </header>
       <div className="chart-wrap highcharts-chart-wrap">
-        <HighchartsReact containerProps={{ className: "highcharts-root" }} highcharts={Highcharts} options={options} />
+        <ResponsiveHighcharts options={options} />
       </div>
     </article>
   );

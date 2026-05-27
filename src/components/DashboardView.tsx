@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { BarChart3, Building2, Flame, HelpCircle, Layers, Lightbulb, Mail, ShieldCheck, Trophy, UsersRound, Wind } from "lucide-react";
+import { BarChart3, Building2, Flame, HelpCircle, Lightbulb, Trophy, UsersRound, Wind } from "lucide-react";
 import { LineChart, MonthlyCycleChart } from "@/components/Charts";
 import type { ExposureMapProps } from "@/components/ExposureMap";
 import { LazyExposureMap } from "@/components/LazyExposureMap";
+import { ObservatoryFooter } from "@/components/ObservatoryFooter";
 import { OverviewRankingTable } from "@/components/OverviewRankingTable";
 import { useObservatoryFilters } from "@/components/ObservatoryContext";
 import {
@@ -67,25 +68,7 @@ export function DashboardView() {
         />
       </section>
 
-      <footer className="observatory-footer">
-        <section>
-          <Layers size={28} aria-hidden />
-          <div>
-            <h2>About the Data</h2>
-            <p>Sentinel-5P TROPOMI Level-2 Tropospheric Column Density (OFFL) QA-filtered.</p>
-          </div>
-        </section>
-        <section>
-          <ShieldCheck size={28} aria-hidden />
-          <h2>Important Note</h2>
-          <p>Satellite NO₂ column represents total atmospheric NO₂ and is not a direct surface concentration.</p>
-        </section>
-        <section>
-          <Mail size={28} aria-hidden />
-          <h2>Contact</h2>
-          <p>westafrica.no2.observatory@gmail.com</p>
-        </section>
-      </footer>
+      <ObservatoryFooter />
     </div>
   );
 }

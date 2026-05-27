@@ -6,6 +6,7 @@ import { FilterBar } from "@/components/FilterBar";
 import { LayerToggles } from "@/components/LayerToggles";
 import { LazyExposureMap } from "@/components/LazyExposureMap";
 import { KpiCards } from "@/components/KpiCards";
+import { ObservatoryFooter } from "@/components/ObservatoryFooter";
 import { useObservatoryFilters } from "@/components/ObservatoryContext";
 import type { Filters, LayerKey } from "@/types/exposure";
 import { DEFAULT_FILTERS, getCountryName, getOverviewMetrics, MONTHS, YEARS } from "@/data/sampleData";
@@ -105,6 +106,7 @@ export function MapExplorer() {
           </div>
         ) : null}
       </section>
+      <ObservatoryFooter />
     </div>
   );
 }

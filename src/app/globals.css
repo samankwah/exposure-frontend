@@ -890,12 +890,13 @@ a {
 .chart-card {
   position: relative;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .chart-wrap {
   position: relative;
-  height: 250px;
+  height: clamp(340px, 42vh, 460px);
+  overflow: visible;
   padding: 8px 10px 0;
 }
 
@@ -907,17 +908,20 @@ a {
 .chart-wrap svg {
   width: 100%;
   height: 100%;
+  overflow: visible;
 }
 
 .highcharts-chart-wrap > div,
 .highcharts-chart-wrap .highcharts-container {
   width: 100% !important;
   height: 100% !important;
+  overflow: visible !important;
 }
 
 .highcharts-chart-wrap .highcharts-root {
   width: 100%;
   height: 100%;
+  overflow: visible !important;
 }
 
 .highcharts-chart-wrap text {
@@ -1017,7 +1021,7 @@ a {
   grid-template-columns: repeat(12, minmax(0, 1fr));
   align-items: end;
   gap: 7px;
-  height: 250px;
+  height: clamp(340px, 42vh, 460px);
   padding: 22px 16px 18px;
 }
 
@@ -1991,7 +1995,7 @@ a {
   .overview-page {
     height: 100%;
     max-width: none;
-    grid-template-rows: 142px minmax(330px, 1fr) 248px 46px;
+    grid-template-rows: 142px minmax(330px, 1fr) 278px 46px;
     gap: 10px;
   }
 
@@ -2009,7 +2013,7 @@ a {
 
   .overview-bottom-grid .chart-wrap,
   .overview-bottom-grid .bar-chart {
-    height: 178px;
+    height: 208px;
   }
 
   .overview-bottom-grid .chart-legend {
@@ -2230,6 +2234,34 @@ a {
     display: grid;
   }
 
+  .map-controls {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    justify-content: stretch;
+    justify-items: stretch;
+  }
+
+  .map-page .page-header {
+    order: 1;
+  }
+
+  .map-page .split-map-grid {
+    order: 4;
+  }
+
+  .map-page .observatory-footer {
+    order: 5;
+  }
+
+  .map-page .map-controls {
+    order: 2;
+  }
+
+  .map-page .kpi-grid {
+    order: 3;
+  }
+
   .page-header {
     align-items: start;
   }
@@ -2238,6 +2270,17 @@ a {
   .section-toolbar .layer-toggles,
   .map-controls .layer-toggles {
     width: 100%;
+  }
+
+  .page-header .export-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .page-header .export-actions button {
+    min-width: 0;
+    padding-inline: 8px;
   }
 
   .map-controls .layer-toggles {
@@ -2258,7 +2301,9 @@ a {
 
   .map-controls .layer-toggles .toggle {
     min-width: 0;
-    padding-inline: 6px;
+    gap: 5px;
+    padding-inline: 8px;
+    font-size: 0.86rem;
   }
 
   .filter-bar,
@@ -2273,11 +2318,31 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .filter-bar,
+  .filter-bar.compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filter-bar label:last-child {
+    grid-column: 1 / -1;
+  }
+
   .map-controls .filter-bar,
   .map-controls .filter-bar.compact,
   .map-controls .range-controls,
   .kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .map-controls > .filter-bar,
+  .map-controls > .range-controls,
+  .map-controls > .layer-toggles {
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .map-controls .filter-bar label:last-child {
+    grid-column: 1 / -1;
   }
 
   .target-kpi-grid {
@@ -2326,7 +2391,24 @@ a {
 
   .overview-bottom-grid .chart-wrap,
   .overview-bottom-grid .bar-chart {
-    height: 228px;
+    height: 280px;
+  }
+
+  .chart-grid .chart-card {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .chart-card .panel-header {
+    padding-inline: 12px;
+  }
+
+  .chart-wrap {
+    padding-inline: 3px;
+  }
+
+  .bar-chart {
+    padding-inline: 8px;
   }
 
   .table-row,
@@ -2402,12 +2484,14 @@ a {
 
   .chart-wrap,
   .bar-chart {
-    height: 228px;
+    height: clamp(360px, 54vh, 470px);
   }
 
   .target-kpi-card {
+    align-items: start;
     grid-template-columns: 34px minmax(0, 1fr);
     padding: 9px 10px;
+    row-gap: 3px;
   }
 
   .target-kpi-card .kpi-icon {
@@ -2427,6 +2511,18 @@ a {
 
   .target-kpi-card strong b {
     font-size: 0.78rem;
+  }
+
+  .target-kpi-card > span,
+  .target-kpi-card strong,
+  .target-kpi-card small,
+  .target-kpi-card em {
+    overflow-wrap: anywhere;
+  }
+
+  .target-kpi-card small,
+  .target-kpi-card em {
+    line-height: 1.15;
   }
 
   .map-panel {
@@ -2481,9 +2577,23 @@ a {
   }
 
   .population-row {
-    grid-template-columns: 76px minmax(104px, 1fr) 54px;
+    grid-template-columns: 74px minmax(92px, 1fr) 66px;
     gap: 5px;
     font-size: 0.58rem;
+  }
+
+  .population-head {
+    align-items: start;
+  }
+
+  .population-column-header {
+    font-size: 0.5rem;
+    line-height: 1.05;
+  }
+
+  .population-column-header small {
+    font-size: 0.46rem;
+    line-height: 1.05;
   }
 
   .population-column-title {
@@ -2549,12 +2659,21 @@ a {
   .bar-chart,
   .overview-bottom-grid .chart-wrap,
   .overview-bottom-grid .bar-chart {
-    height: 210px;
+    height: 370px;
+  }
+
+  .chart-grid {
+    width: 100%;
+    margin-inline: 0;
+  }
+
+  .chart-wrap {
+    padding-inline: 0;
   }
 
   .population-row {
-    grid-template-columns: 70px minmax(92px, 1fr) 46px;
-    font-size: 0.54rem;
+    grid-template-columns: 64px minmax(86px, 1fr) 64px;
+    font-size: 0.52rem;
   }
 
   .target-kpi-grid {
@@ -2562,6 +2681,7 @@ a {
   }
 
   .target-kpi-card {
+    grid-template-columns: 30px minmax(0, 1fr);
     padding: 8px;
   }
 
@@ -2569,9 +2689,21 @@ a {
     font-size: 0.62rem;
   }
 
+  .target-kpi-card strong {
+    font-size: 0.96rem;
+  }
+
   .target-kpi-card small,
   .target-kpi-card em {
     font-size: 0.58rem;
+  }
+
+  .population-column-header {
+    font-size: 0.46rem;
+  }
+
+  .population-column-header small {
+    font-size: 0.42rem;
   }
 }
 

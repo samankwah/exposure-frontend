@@ -76,6 +76,13 @@ const OVERVIEW_NO2_VIEW_STATE = {
   zoom: 3.88,
 };
 
+const MOBILE_OVERVIEW_NO2_VIEW_STATE = {
+  ...INITIAL_VIEW_STATE,
+  longitude: -1.1,
+  latitude: 10.25,
+  zoom: 4.18,
+};
+
 const FIRE_ACTIVITY_VIEW_STATE = {
   ...INITIAL_VIEW_STATE,
   longitude: -1.4,
@@ -175,6 +182,7 @@ export function ExposureMap({
   showLabels = true,
 }: ExposureMapProps) {
   const [isClient, setIsClient] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [no2Data, setNo2Data] = useState<{
     surface: No2Surface;
     raster: No2Raster;
@@ -203,7 +211,9 @@ export function ExposureMap({
   const countryLabels = filters.countryId === "all" ? COUNTRY_LABELS : [];
   const initialViewState =
     compact && activeLayers.no2
-      ? OVERVIEW_NO2_VIEW_STATE
+      ? isMobileViewport
+        ? MOBILE_OVERVIEW_NO2_VIEW_STATE
+        : OVERVIEW_NO2_VIEW_STATE
       : compact && activeLayers.fire && !activeLayers.no2
         ? FIRE_ACTIVITY_VIEW_STATE
         : INITIAL_VIEW_STATE;
@@ -214,6 +224,23 @@ export function ExposureMap({
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  useEffect(() => {
+    if (!compact) {
+      setIsMobileViewport(false);
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 560px)");
+    const syncMobileViewport = () => setIsMobileViewport(mediaQuery.matches);
+
+    syncMobileViewport();
+    mediaQuery.addEventListener("change", syncMobileViewport);
+
+    return () => {
+      mediaQuery.removeEventListener("change", syncMobileViewport);
+    };
+  }, [compact]);
 
   useEffect(() => {
     setViewState(normalizeMapViewState(initialViewState));

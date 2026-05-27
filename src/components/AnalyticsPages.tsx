@@ -6,6 +6,7 @@ import { BarChart, LineChart } from "@/components/Charts";
 import { ExportButtons } from "@/components/ExportButtons";
 import { FilterBar } from "@/components/FilterBar";
 import { KpiCards } from "@/components/KpiCards";
+import { ObservatoryFooter } from "@/components/ObservatoryFooter";
 import { RankingTable } from "@/components/RankingTable";
 import { useObservatoryFilters } from "@/components/ObservatoryContext";
 import type { Filters } from "@/types/exposure";
@@ -55,6 +56,7 @@ export function TrendsView() {
         <BarChart data={monthlyCycle} eyebrow="Monthly" label="Exposure" metricKey="exposure" title="Monthly exposure load" />
       </section>
       <RankingTable rows={ranking} selectedId={filters.countryId} onSelect={(countryId) => setFilters({ ...filters, countryId, cityId: "all" })} />
+      <ObservatoryFooter />
     </div>
   );
 }
@@ -102,6 +104,7 @@ export function FireSeasonalityView() {
           unit=" ppb"
         />
       </section>
+      <ObservatoryFooter />
     </div>
   );
 }
@@ -145,6 +148,7 @@ export function ReportsView() {
           <RankingTable rows={ranking.slice(0, 5)} selectedId={filters.countryId} onSelect={(countryId) => setFilters({ ...filters, countryId, cityId: "all" })} />
         </aside>
       </section>
+      <ObservatoryFooter />
     </div>
   );
 }
@@ -185,6 +189,7 @@ export function AdminView() {
         <p>2026-05-26 09:33 UTC - Top quartile hotspot cache refreshed.</p>
         <p>2026-05-26 09:35 UTC - Report export endpoint ready for browser print workflow.</p>
       </article>
+      <ObservatoryFooter />
     </div>
   );
 }

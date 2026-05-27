@@ -61,7 +61,10 @@ export function TrendsView() {
 
 export function FireSeasonalityView() {
   const { filters, setFilters } = useObservatoryFilters();
-  const fireFilters: Filters = filters.season === "all" ? { ...filters, season: "dry" } : filters;
+  const fireFilters: Filters = useMemo(
+    () => (filters.season === "all" ? { ...filters, season: "dry" } : filters),
+    [filters]
+  );
   const updateFilters = (next: Filters) => setFilters((current) => ({ ...current, ...next }));
   const monthlyCycle = useMemo(() => getMonthlyCycle(fireFilters), [fireFilters]);
   const annualTrend = useMemo(() => getAnnualTrend(fireFilters), [fireFilters]);

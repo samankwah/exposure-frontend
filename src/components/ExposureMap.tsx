@@ -179,15 +179,7 @@ export function ExposureMap({
     : INTERPOLATION_CELL_DEGREES;
   const no2CacheKey = useMemo(
     () => getNo2CacheKey(filters, no2CellSize),
-    [
-      filters.regionId,
-      filters.countryId,
-      filters.cityId,
-      filters.year,
-      filters.month,
-      filters.season,
-      no2CellSize,
-    ],
+    [filters, no2CellSize],
   );
   const no2Surface = no2Data.surface;
   const no2Raster = no2Data.raster;

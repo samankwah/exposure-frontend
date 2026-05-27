@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { Filters } from "@/types/exposure";
 import { DEFAULT_FILTERS, YEARS } from "@/data/sampleData";
@@ -33,22 +33,22 @@ export function ObservatoryProvider({ children }: { children: ReactNode }) {
   const [filters, setFilterState] = useState<ObservatoryFilters>(defaultFilters);
   const [stagedFilters, setStagedFilters] = useState<ObservatoryFilters>(defaultFilters);
 
-  const setFilters: Dispatch<SetStateAction<ObservatoryFilters>> = (next) => {
+  const setFilters: Dispatch<SetStateAction<ObservatoryFilters>> = useCallback((next) => {
     setFilterState((current) => {
       const resolved = typeof next === "function" ? next(current) : next;
       const normalized = normalizeFilters(resolved);
       setStagedFilters(normalized);
       return normalized;
     });
-  };
+  }, []);
 
-  const applyStagedFilters = () => {
+  const applyStagedFilters = useCallback(() => {
     setFilterState(normalizeFilters(stagedFilters));
-  };
+  }, [stagedFilters]);
 
   const value = useMemo(
     () => ({ filters, stagedFilters, setFilters, setStagedFilters, applyStagedFilters }),
-    [filters, stagedFilters]
+    [applyStagedFilters, filters, setFilters, stagedFilters]
   );
 
   return <ObservatoryContext.Provider value={value}>{children}</ObservatoryContext.Provider>;

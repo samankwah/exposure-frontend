@@ -521,8 +521,27 @@ a {
   min-height: 420px;
 }
 
-.map-panel .maplibregl-control-container {
-  z-index: 3;
+.map-panel .maplibregl-control-container,
+.map-panel .mapboxgl-control-container {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  pointer-events: none;
+}
+
+.map-panel .maplibregl-ctrl-top-left,
+.map-panel .maplibregl-ctrl-bottom-left,
+.map-panel .maplibregl-ctrl-bottom-right,
+.map-panel .mapboxgl-ctrl-top-left,
+.map-panel .mapboxgl-ctrl-bottom-left,
+.map-panel .mapboxgl-ctrl-bottom-right {
+  z-index: 9;
+  pointer-events: none;
+}
+
+.map-panel .maplibregl-ctrl,
+.map-panel .mapboxgl-ctrl {
+  pointer-events: auto;
 }
 
 .tropomi-map-card {

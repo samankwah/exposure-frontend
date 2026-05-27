@@ -4,6 +4,7 @@ out/
 dist/
 coverage/
 screenshots/
+*.log
 .env
 .env.*
 !.env.example

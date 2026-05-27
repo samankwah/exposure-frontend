@@ -3,13 +3,16 @@ import type {
   City,
   Country,
   Filters,
+  FireActivityPoint,
   Hotspot,
+  InterpolatedNo2Cell,
   MonthlyMetric,
   RankingRow,
   Season,
   SummaryMetric,
   TrendPoint
 } from "@/types/exposure";
+import abnMapBoundary from "./abnMapBoundary.json";
 
 export const YEARS = [2020, 2021, 2022, 2023, 2024];
 export const NO2_COLUMN_UNIT = "x10^15 molecules cm^-2";
@@ -304,6 +307,40 @@ export const HOTSPOTS: Hotspot[] = GENERATED_HOTSPOTS.concat([
   }
 ]);
 
+export const FIRE_ACTIVITY_POINTS: FireActivityPoint[] = COUNTRIES.flatMap((country, countryIndex) => {
+  const longitudes = country.polygon.map(([longitude]) => longitude);
+  const latitudes = country.polygon.map(([, latitude]) => latitude);
+  const minLongitude = Math.min(...longitudes);
+  const maxLongitude = Math.max(...longitudes);
+  const minLatitude = Math.min(...latitudes);
+  const maxLatitude = Math.max(...latitudes);
+  const count = country.region === "Sahel" ? 42 : country.id === "nga" || country.id === "gha" || country.id === "civ" ? 34 : 24;
+  const dryMonths = [1, 2, 3, 4, 11, 12];
+  const wetMonths = [5, 6, 7, 8, 9, 10];
+
+  return Array.from({ length: count }, (_, index) => {
+    const seed = (countryIndex + 1) * 97 + index * 31;
+    const longitudeFactor = (Math.sin(seed * 12.9898) + 1) / 2;
+    const latitudeFactor = (Math.sin(seed * 78.233) + 1) / 2;
+    const month = index % 4 === 0 ? wetMonths[(index + countryIndex) % wetMonths.length] : dryMonths[(index + countryIndex) % dryMonths.length];
+    const sahelBoost = country.region === "Sahel" ? 38 : 0;
+    const gulfBoost = country.region.includes("Gulf") || country.id === "nga" ? 16 : 0;
+
+    return {
+      id: `fire-${country.id}-${index}`,
+      countryId: country.id,
+      label: `${country.name} fire pixel ${index + 1}`,
+      coordinates: [
+        round(minLongitude + longitudeFactor * (maxLongitude - minLongitude), 3),
+        round(minLatitude + latitudeFactor * (maxLatitude - minLatitude), 3)
+      ],
+      frp: round(18 + sahelBoost + gulfBoost + Math.abs(Math.sin(seed * 0.41)) * 116, 1),
+      month,
+      season: seasonForMonth(month)
+    };
+  });
+});
+
 const OVERVIEW_TREND: Record<number, number> = {
   2020: 2.08,
   2021: 2.21,
@@ -315,6 +352,107 @@ const OVERVIEW_TREND: Record<number, number> = {
 const MEAN_COLUMN_SCALE = 2.45 / 17.7;
 const COUNTRY_COLUMN_SCALE = 4.72 / 28.6;
 const HOTSPOT_COLUMN_SCALE = 8.61 / 42.7;
+export const INTERPOLATION_RESOLUTION_KM = 27;
+export const INTERPOLATION_CELL_DEGREES = INTERPOLATION_RESOLUTION_KM / 111.32;
+export const WEST_AFRICA_INTERPOLATION_BOUNDS = [-18.2, 1.6, 24.2, 25.3] as const;
+
+const WEST_AFRICA_LAND_MASK: [number, number][] = [
+  [-18.2, 16.9],
+  [-16.8, 20.4],
+  [-12.2, 25.3],
+  [4.6, 25.3],
+  [16.8, 23.9],
+  [16.8, 10.4],
+  [14.9, 10.4],
+  [14.8, 4.0],
+  [12.4, 4.2],
+  [10.4, 3.9],
+  [8.8, 4.3],
+  [7.2, 4.7],
+  [5.8, 5.3],
+  [4.6, 6.0],
+  [3.3, 6.4],
+  [2.2, 6.3],
+  [1.1, 6.1],
+  [0.2, 5.8],
+  [-0.7, 5.4],
+  [-1.8, 5.1],
+  [-3.2, 5.0],
+  [-4.5, 5.1],
+  [-5.8, 5.0],
+  [-7.3, 4.6],
+  [-8.4, 4.8],
+  [-9.7, 5.6],
+  [-10.8, 6.3],
+  [-11.8, 7.1],
+  [-13.0, 8.4],
+  [-13.8, 9.6],
+  [-14.4, 10.9],
+  [-15.4, 12.1],
+  [-16.7, 13.4],
+  [-17.6, 14.9],
+  [-18.2, 16.9]
+];
+
+const REGIONAL_NO2_ANCHORS = [
+  { label: "Mauritania", coordinates: [-10.2, 20.4], value: 1.11, weight: 0.95 },
+  { label: "Mali", coordinates: [-3.8, 17.4], value: 1.82, weight: 1.1 },
+  { label: "Niger", coordinates: [8.2, 17.5], value: 1.52, weight: 1.1 },
+  { label: "Chad", coordinates: [15.0, 15.7], value: 0.71, weight: 0.95 },
+  { label: "Senegal", coordinates: [-14.4, 14.5], value: 2.53, weight: 1.15 },
+  { label: "The Gambia", coordinates: [-15.5, 13.5], value: 0.98, weight: 0.9 },
+  { label: "Guinea-Bissau", coordinates: [-15.0, 12.0], value: 1.05, weight: 0.9 },
+  { label: "Guinea", coordinates: [-10.9, 10.4], value: 1.64, weight: 1.05 },
+  { label: "Sierra Leone", coordinates: [-11.8, 8.5], value: 1.29, weight: 0.95 },
+  { label: "Liberia", coordinates: [-9.5, 6.5], value: 1.33, weight: 0.95 },
+  { label: "Cote d'Ivoire", coordinates: [-5.5, 7.7], value: 2.89, weight: 1.2 },
+  { label: "Ghana", coordinates: [-1.1, 7.9], value: 3.31, weight: 1.2 },
+  { label: "Togo", coordinates: [0.9, 8.6], value: 1.98, weight: 1.05 },
+  { label: "Benin", coordinates: [2.4, 9.4], value: 2.17, weight: 1.05 },
+  { label: "Burkina Faso", coordinates: [-1.6, 12.2], value: 1.71, weight: 1.1 },
+  { label: "Nigeria", coordinates: [8.1, 9.4], value: 4.72, weight: 1.35 },
+  { label: "Cameroon", coordinates: [12.7, 6.7], value: 2.28, weight: 1.05 },
+  { label: "Dakar plume", coordinates: [-17.4, 14.7], value: 6.7, weight: 3.2 },
+  { label: "Bamako corridor", coordinates: [-8.0, 12.6], value: 3.3, weight: 2.1 },
+  { label: "Abidjan plume", coordinates: [-4.0, 5.4], value: 5.8, weight: 2.9 },
+  { label: "Accra coastal plume", coordinates: [-0.2, 5.6], value: 5.2, weight: 2.6 },
+  { label: "Lagos urban plume", coordinates: [3.4, 6.5], value: 8.61, weight: 5.2 },
+  { label: "Kano urban plume", coordinates: [8.5, 12.0], value: 7.6, weight: 4.3 },
+  { label: "Lake Chad plume", coordinates: [14.2, 12.7], value: 5.4, weight: 2.8 }
+] satisfies Array<{ label: string; coordinates: [number, number]; value: number; weight: number }>;
+
+const REGIONAL_FIRE_CLUSTERS = [
+  { label: "Senegal savanna", center: [-14.7, 13.5], spread: [3.0, 1.2], count: 80, boost: 18 },
+  { label: "Guinea savanna", center: [-9.2, 9.3], spread: [4.8, 1.5], count: 95, boost: 12 },
+  { label: "Cote d'Ivoire-Ghana transition", center: [-3.0, 7.8], spread: [4.2, 1.4], count: 88, boost: 10 },
+  { label: "Burkina Faso grassland", center: [-1.1, 12.0], spread: [4.6, 1.8], count: 96, boost: 28 },
+  { label: "Nigeria savanna", center: [7.4, 9.4], spread: [5.0, 1.9], count: 130, boost: 34 },
+  { label: "Cameroon corridor", center: [12.7, 7.3], spread: [2.8, 1.2], count: 58, boost: 20 },
+  { label: "Chad basin", center: [14.8, 12.5], spread: [2.6, 1.2], count: 46, boost: 24 }
+] as const;
+
+const REGIONAL_FIRE_ACTIVITY_POINTS: FireActivityPoint[] = REGIONAL_FIRE_CLUSTERS.flatMap((cluster, clusterIndex) => {
+  const months = [1, 2, 3, 3, 3, 4, 11, 12];
+
+  return Array.from({ length: cluster.count }, (_, index) => {
+    const seed = (clusterIndex + 4) * 131 + index * 37;
+    const longitudeNoise = Math.sin(seed * 12.9898) * 0.62 + Math.sin(seed * 3.174) * 0.38;
+    const latitudeNoise = Math.sin(seed * 78.233) * 0.58 + Math.cos(seed * 5.271) * 0.42;
+    const longitude = cluster.center[0] + longitudeNoise * cluster.spread[0];
+    const latitude = cluster.center[1] + latitudeNoise * cluster.spread[1];
+    const month = months[(index + clusterIndex) % months.length];
+
+    return {
+      id: `regional-fire-${clusterIndex}-${index}`,
+      countryId: "regional",
+      label: `${cluster.label} VIIRS pixel ${index + 1}`,
+      coordinates: [round(longitude, 3), round(latitude, 3)],
+      frp: round(20 + cluster.boost + Math.abs(Math.sin(seed * 0.61)) * 142, 1),
+      month,
+      season: seasonForMonth(month)
+    };
+  });
+});
 
 function regionCountryIds(regionId?: string) {
   const region = REGIONS.find((item) => item.id === (regionId ?? "west-africa"));
@@ -370,6 +508,222 @@ export function getHotspots(filters: Filters) {
   });
 
   return filtered.sort((a, b) => b.no2 - a.no2);
+}
+
+export function getFireActivityPoints(filters: Filters) {
+  const countryIds = new Set(getCountriesForFilter(filters).map((country) => country.id));
+  const includeRegionalBackdrop = filters.countryId === "all" && (filters.regionId ?? "west-africa") === "west-africa";
+  const sourcePoints = includeRegionalBackdrop ? FIRE_ACTIVITY_POINTS.concat(REGIONAL_FIRE_ACTIVITY_POINTS) : FIRE_ACTIVITY_POINTS;
+
+  return sourcePoints.filter((point) => {
+    if (point.countryId !== "regional" && !countryIds.has(point.countryId)) return false;
+    if (point.countryId === "regional" && !includeRegionalBackdrop) return false;
+    if (filters.month !== "all" && point.month !== filters.month) return false;
+    if (filters.season !== "all" && point.season !== filters.season) return false;
+    return true;
+  }).sort((a, b) => b.frp - a.frp);
+}
+
+export function getInterpolatedNo2Cells(filters: Filters, cellSize = INTERPOLATION_CELL_DEGREES) {
+  const countries = getCountriesForFilter({ ...filters, cityId: "all" });
+  const countryIds = new Set(countries.map((country) => country.id));
+  const ranking = new Map(getOverviewCountryRanking({ ...filters, countryId: "all", cityId: "all" }).map((row) => [row.id, row.no2]));
+  const bounds = getInterpolationBounds(filters, countries);
+  const sourceBounds = expandBounds(bounds, 3.25);
+  const sources = [
+    ...REGIONAL_NO2_ANCHORS.filter((anchor) => pointInBounds(anchor.coordinates, sourceBounds)).map((anchor) => ({
+      coordinates: anchor.coordinates,
+      value: anchor.value,
+      weight: anchor.weight,
+      label: anchor.label
+    })),
+    ...countries.map((country) => ({
+      coordinates: country.centroid,
+      value: ranking.get(country.id) ?? toNo2ColumnValue(country.baselineNo2, "country"),
+      weight: 1.15,
+      label: country.name
+    })),
+    ...HOTSPOTS.filter((hotspot) => countryIds.has(hotspot.countryId) && pointInBounds(hotspot.coordinates, sourceBounds)).map((hotspot) => ({
+      coordinates: hotspot.coordinates,
+      value: toNo2ColumnValue(hotspot.no2, "hotspot"),
+      weight: hotspot.category === "urban" ? 4.2 : 3.1,
+      label: hotspot.label
+    }))
+  ];
+  const cells: InterpolatedNo2Cell[] = [];
+  const [west, south, east, north] = bounds;
+
+  for (let longitude = west; longitude < east; longitude += cellSize) {
+    for (let latitude = south; latitude < north; latitude += cellSize) {
+      const centroid: [number, number] = [round(longitude + cellSize / 2, 3), round(latitude + cellSize / 2, 3)];
+      if (!isInsideInterpolationMask(centroid, filters, countries)) continue;
+
+      const interpolated = interpolateNo2Column(centroid, sources);
+      const texture =
+        Math.sin((centroid[0] + 19.5) * 3.8 + centroid[1] * 0.47) * 0.16 +
+        Math.cos((centroid[1] - 3.4) * 4.2 + centroid[0] * 0.31) * 0.13 +
+        Math.sin(centroid[0] * 15.3 + centroid[1] * 7.7) * 0.08 +
+        Math.cos(centroid[0] * 22.1 - centroid[1] * 5.3) * 0.05;
+      const coastalFade = centroid[1] < 4.9 ? -0.35 : centroid[1] < 5.8 ? -0.14 : 0;
+      const column = clamp(round(interpolated * 0.82 + 0.18 + texture + coastalFade, 2), 0.05, 10.4);
+
+      cells.push({
+        id: `cell-${round(longitude, 2)}-${round(latitude, 2)}`,
+        countryId: "interpolated",
+        countryName: closestNo2SourceName(centroid, sources),
+        centroid,
+        column,
+        polygon: [
+          [round(longitude, 3), round(latitude, 3)],
+          [round(Math.min(longitude + cellSize, east), 3), round(latitude, 3)],
+          [round(Math.min(longitude + cellSize, east), 3), round(Math.min(latitude + cellSize, north), 3)],
+          [round(longitude, 3), round(Math.min(latitude + cellSize, north), 3)],
+          [round(longitude, 3), round(latitude, 3)]
+        ]
+      });
+    }
+  }
+
+  return {
+    type: "FeatureCollection",
+    features: cells.map((cell) => ({
+      type: "Feature",
+      properties: {
+        id: cell.id,
+        countryId: cell.countryId,
+        countryName: cell.countryName,
+        column: cell.column,
+        resolutionKm: INTERPOLATION_RESOLUTION_KM
+      },
+      geometry: {
+        type: "Polygon",
+        coordinates: [cell.polygon]
+      }
+    }))
+  } as const;
+}
+
+type InterpolationSource = {
+  coordinates: [number, number];
+  value: number;
+  weight: number;
+  label: string;
+};
+
+function getInterpolationBounds(filters: Filters, countries: Country[]): [number, number, number, number] {
+  if (filters.countryId === "all" && (filters.regionId ?? "west-africa") === "west-africa") {
+    return [...WEST_AFRICA_INTERPOLATION_BOUNDS];
+  }
+
+  if (countries.length === 0) {
+    return [...WEST_AFRICA_INTERPOLATION_BOUNDS];
+  }
+
+  const longitudes = countries.flatMap((country) => country.polygon.map(([longitude]) => longitude));
+  const latitudes = countries.flatMap((country) => country.polygon.map(([, latitude]) => latitude));
+  const padding = filters.countryId === "all" ? 1.45 : 1.05;
+
+  return expandBounds(
+    [Math.min(...longitudes), Math.min(...latitudes), Math.max(...longitudes), Math.max(...latitudes)],
+    padding
+  );
+}
+
+function expandBounds(bounds: readonly [number, number, number, number], padding: number): [number, number, number, number] {
+  return [bounds[0] - padding, bounds[1] - padding, bounds[2] + padding, bounds[3] + padding];
+}
+
+function pointInBounds(point: [number, number], bounds: readonly [number, number, number, number]) {
+  return point[0] >= bounds[0] && point[0] <= bounds[2] && point[1] >= bounds[1] && point[1] <= bounds[3];
+}
+
+function isInsideInterpolationMask(point: [number, number], filters: Filters, countries: Country[]) {
+  if (filters.countryId === "all" && (filters.regionId ?? "west-africa") === "west-africa") {
+    return pointInPolygon(point, WEST_AFRICA_LAND_MASK) || pointInGeoJsonFeatureCollection(point, abnMapBoundary as any);
+  }
+
+  if (!pointInPolygon(point, WEST_AFRICA_LAND_MASK) && !pointInGeoJsonFeatureCollection(point, abnMapBoundary as any)) return false;
+
+  return countries.some((country) => pointInPolygon(point, country.polygon));
+}
+
+function pointInGeoJsonFeatureCollection(point: [number, number], collection: any) {
+  return Boolean(
+    collection.features?.some((feature: any) => {
+      const geometry = feature.geometry;
+      if (!geometry) return false;
+
+      if (geometry.type === "Polygon") {
+        return pointInPolygonWithHoles(point, geometry.coordinates);
+      }
+
+      if (geometry.type === "MultiPolygon") {
+        return geometry.coordinates.some((polygon: [number, number][][]) => pointInPolygonWithHoles(point, polygon));
+      }
+
+      return false;
+    })
+  );
+}
+
+function pointInPolygonWithHoles(point: [number, number], polygon: [number, number][][]) {
+  if (!polygon[0] || !pointInPolygon(point, polygon[0])) return false;
+  return !polygon.slice(1).some((hole) => pointInPolygon(point, hole));
+}
+
+function pointInPolygon(point: [number, number], polygon: [number, number][]) {
+  const [longitude, latitude] = point;
+  let inside = false;
+
+  for (let index = 0, previousIndex = polygon.length - 1; index < polygon.length; previousIndex = index, index += 1) {
+    const [longitudeA, latitudeA] = polygon[index];
+    const [longitudeB, latitudeB] = polygon[previousIndex];
+    const intersects =
+      latitudeA > latitude !== latitudeB > latitude &&
+      longitude < ((longitudeB - longitudeA) * (latitude - latitudeA)) / (latitudeB - latitudeA) + longitudeA;
+
+    if (intersects) inside = !inside;
+  }
+
+  return inside;
+}
+
+function closestNo2SourceName(target: [number, number], sources: InterpolationSource[]) {
+  if (sources.length === 0) return "West Africa interpolation";
+
+  return sources.reduce(
+    (closest, source) => {
+      const longitudeDistance = target[0] - source.coordinates[0];
+      const latitudeDistance = target[1] - source.coordinates[1];
+      const distanceSquared = longitudeDistance * longitudeDistance + latitudeDistance * latitudeDistance;
+      return distanceSquared < closest.distanceSquared ? { label: source.label, distanceSquared } : closest;
+    },
+    { label: "West Africa interpolation", distanceSquared: Number.POSITIVE_INFINITY }
+  ).label;
+}
+
+function interpolateNo2Column(
+  target: [number, number],
+  sources: InterpolationSource[]
+) {
+  let numerator = 0;
+  let denominator = 0;
+
+  sources.forEach((source) => {
+    const longitudeDistance = target[0] - source.coordinates[0];
+    const latitudeDistance = (target[1] - source.coordinates[1]) * 1.12;
+    const distanceSquared = longitudeDistance * longitudeDistance + latitudeDistance * latitudeDistance;
+    const exponent = source.weight > 2 ? 1.85 : 1.48;
+    const influence = source.weight / Math.pow(distanceSquared + 0.055, exponent);
+    numerator += source.value * influence;
+    denominator += influence;
+  });
+
+  return denominator === 0 ? 0 : numerator / denominator;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
 export function getHotspotThreshold(filters: Filters) {

@@ -18,6 +18,7 @@ import {
   CITIES,
   NO2_COLUMN_UNIT,
   NO2_COLUMN_UNIT_LABEL,
+  INTERPOLATION_RESOLUTION_KM,
   REGIONS,
   YEARS,
   getCitiesForCountry,
@@ -204,7 +205,7 @@ function ObservatoryShell({ children }: { children: ReactNode }) {
             <a href="#about-data">Learn more →</a>
           </section>
 
-          <p className="rail-source">Data Source: Sentinel-5P TROPOMI Spatial Resolution: ~3.5 km x 5.5 km Daily Global Coverage</p>
+          <p className="rail-source">Data Source: Sentinel-5P TROPOMI Spatial interpolation grid: {INTERPOLATION_RESOLUTION_KM} km Daily Global Coverage</p>
         </aside>
 
         <main className="content-shell">{children}</main>

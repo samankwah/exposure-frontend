@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { BarChart3, Building2, Flame, HelpCircle, Lightbulb, Trophy, UsersRound, Wind } from "lucide-react";
-import { BarChart, LineChart } from "@/components/Charts";
-import { ExposureMap } from "@/components/ExposureMap";
+import { BarChart3, Building2, Flame, HelpCircle, Layers, Lightbulb, Mail, ShieldCheck, Trophy, UsersRound, Wind } from "lucide-react";
+import { LineChart, MonthlyCycleChart } from "@/components/Charts";
+import type { ExposureMapProps } from "@/components/ExposureMap";
+import { LazyExposureMap } from "@/components/LazyExposureMap";
 import { OverviewRankingTable } from "@/components/OverviewRankingTable";
 import { useObservatoryFilters } from "@/components/ObservatoryContext";
 import {
@@ -16,6 +17,12 @@ import {
 const OVERVIEW_LAYERS = {
   no2: true,
   fire: false,
+  population: false
+};
+
+const FIRE_ACTIVITY_LAYERS = {
+  no2: false,
+  fire: true,
   population: false
 };
 
@@ -46,9 +53,15 @@ export function DashboardView() {
           primaryLabel="NO₂ column"
           title="2020-2024 trend"
           unit={` ${NO2_COLUMN_UNIT_LABEL}`}
+          variant="overview"
         />
-        <BarChart data={monthlyCycle} eyebrow="Monthly cycle (West Africa average)" label="NO₂ column" metricKey="no2" title="Monthly cycle" />
-        <FireActivityCard />
+        <MonthlyCycleChart
+          data={monthlyCycle}
+          eyebrow="Monthly cycle (West Africa average)"
+          title="Monthly cycle"
+          unit={` ${NO2_COLUMN_UNIT_LABEL}`}
+        />
+        <FireActivityCard filters={filters} />
         <InsightsCard
           topHotspot={topHotspot?.label ?? "Lagos"}
         />
@@ -56,14 +69,19 @@ export function DashboardView() {
 
       <footer className="observatory-footer">
         <section>
-          <h2>About the Data</h2>
-          <p>Sentinel-5P TROPOMI Level-2 Tropospheric Column Density (OFFL) QA-filtered.</p>
+          <Layers size={28} aria-hidden />
+          <div>
+            <h2>About the Data</h2>
+            <p>Sentinel-5P TROPOMI Level-2 Tropospheric Column Density (OFFL) QA-filtered.</p>
+          </div>
         </section>
         <section>
+          <ShieldCheck size={28} aria-hidden />
           <h2>Important Note</h2>
           <p>Satellite NO₂ column represents total atmospheric NO₂ and is not a direct surface concentration.</p>
         </section>
         <section>
+          <Mail size={28} aria-hidden />
           <h2>Contact</h2>
           <p>westafrica.no2.observatory@gmail.com</p>
         </section>
@@ -77,7 +95,7 @@ function OverviewMapCard({
   selectedCountryId,
   onSelectCountry
 }: {
-  filters: Parameters<typeof ExposureMap>[0]["filters"];
+  filters: ExposureMapProps["filters"];
   selectedCountryId: string;
   onSelectCountry: (countryId: string) => void;
 }) {
@@ -101,7 +119,7 @@ function OverviewMapCard({
         </div>
       </header>
       <div className="tropomi-map-body">
-        <ExposureMap
+        <LazyExposureMap
           activeLayers={OVERVIEW_LAYERS}
           compact
           filters={filters}
@@ -163,7 +181,7 @@ function OverviewKpis() {
   );
 }
 
-function FireActivityCard() {
+function FireActivityCard({ filters }: { filters: ExposureMapProps["filters"] }) {
   return (
     <article className="chart-card fire-card target-fire-card">
       <header className="panel-header">
@@ -171,20 +189,19 @@ function FireActivityCard() {
         <strong>Mean FRP (MW)</strong>
       </header>
       <div className="fire-mini-map target-fire-map" aria-label="Fire activity mini map">
-        {[...Array(90)].map((_, index) => (
-          <span
-            className="target-fire-dot"
-            key={index}
-            style={{
-              left: `${6 + ((index * 17) % 88)}%`,
-              top: `${12 + ((index * 31) % 72)}%`,
-              opacity: `${0.35 + (index % 7) * 0.08}`
-            }}
-          />
-        ))}
+        <LazyExposureMap
+          activeLayers={FIRE_ACTIVITY_LAYERS}
+          compact
+          controls={false}
+          filters={{ ...filters, month: 3, season: "all" }}
+          legend="none"
+          selectedCountryId={filters.countryId}
+          showLabels={false}
+          onSelectCountry={() => undefined}
+        />
       </div>
       <div className="target-fire-footer">
-        <button type="button">Mar 2024</button>
+        <button type="button">Mar {filters.year}</button>
         <span>Low</span>
         <i />
         <span>High</span>

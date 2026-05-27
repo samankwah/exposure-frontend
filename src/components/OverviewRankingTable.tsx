@@ -37,8 +37,8 @@ export function OverviewRankingTable() {
             NO{"\u2082"} Column
             <small>(×10{"\u00B9\u2075"} molecules cm{"\u207B\u00B2"})</small>
           </span>
-          <span role="columnheader">
-            Population in High-Column
+          <span className="population-column-header" role="columnheader">
+            <span className="population-column-title">Population in High-Column</span>
             <small>Hotspot Zones (Millions)</small>
           </span>
         </div>

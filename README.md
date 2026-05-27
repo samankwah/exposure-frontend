@@ -11,6 +11,15 @@ cmd /c npm run dev
 
 Open `http://localhost:3000`.
 
+## Boundary Data
+
+The Africa contour shapefile is stored in `data/shapefiles/africa-contour-map`.
+The browser map imports `src/data/africaContourMap.json`, generated from that shapefile:
+
+```bash
+cmd /c npm run build:africa-contour
+```
+
 ## Verification
 
 ```bash

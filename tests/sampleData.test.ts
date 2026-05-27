@@ -6,6 +6,7 @@ import {
   getCountryRanking,
   getHotspotThreshold,
   getHotspots,
+  getInterpolatedNo2Cells,
   getMonthlyCycle,
   getSummaryMetrics
 } from "../src/data/sampleData";
@@ -37,5 +38,13 @@ describe("sample analytics", () => {
     expect(getAnnualTrend(DEFAULT_FILTERS)).toHaveLength(5);
     expect(getMonthlyCycle(DEFAULT_FILTERS)).toHaveLength(12);
     expect(COUNTRIES.length).toBeGreaterThan(10);
+  });
+
+  it("spans the eastern Chad and Cameroon shapefile extent in the default raster", () => {
+    const surface = getInterpolatedNo2Cells(DEFAULT_FILTERS, 0.5);
+    const centroids = surface.features.map((feature) => feature.properties.id.split("cell-")[1].split("-").map(Number));
+
+    expect(centroids.some(([longitude, latitude]) => longitude > 22 && latitude > 12 && latitude < 20)).toBe(true);
+    expect(centroids.some(([longitude, latitude]) => longitude > 15.5 && latitude < 3.5)).toBe(true);
   });
 });

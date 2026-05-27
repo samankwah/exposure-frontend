@@ -52,6 +52,25 @@ export interface Hotspot {
   category: "urban" | "industrial" | "fire" | "transport";
 }
 
+export interface FireActivityPoint {
+  id: string;
+  countryId: string;
+  label: string;
+  coordinates: [number, number];
+  frp: number;
+  month: number;
+  season: Exclude<Season, "all">;
+}
+
+export interface InterpolatedNo2Cell {
+  id: string;
+  countryId: string;
+  countryName: string;
+  centroid: [number, number];
+  column: number;
+  polygon: [number, number][];
+}
+
 export interface Filters {
   regionId?: string;
   countryId: string;

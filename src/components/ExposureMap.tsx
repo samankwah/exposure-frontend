@@ -8,11 +8,8 @@ import {
   ScatterplotLayer,
   TextLayer,
 } from "@deck.gl/layers";
-import MapLibreMap, {
-  NavigationControl,
-  ScaleControl,
-} from "react-map-gl/maplibre";
-import { Layers } from "lucide-react";
+import MapLibreMap, { ScaleControl } from "react-map-gl/maplibre";
+import { Layers, Minus, Plus } from "lucide-react";
 import { MapPanelSkeleton } from "@/components/Skeletons";
 import type {
   City,
@@ -85,6 +82,19 @@ const FIRE_ACTIVITY_VIEW_STATE = {
   latitude: 9.6,
   zoom: 3.25,
 };
+
+type MapViewState = typeof INITIAL_VIEW_STATE;
+
+function normalizeMapViewState(viewState: Partial<MapViewState>): MapViewState {
+  return {
+    ...INITIAL_VIEW_STATE,
+    ...viewState,
+    minZoom: INITIAL_VIEW_STATE.minZoom,
+    maxZoom: INITIAL_VIEW_STATE.maxZoom,
+    pitch: viewState.pitch ?? 0,
+    bearing: viewState.bearing ?? 0,
+  };
+}
 
 const OVERVIEW_CITY_LABELS = new Set([
   "dakar",
@@ -197,10 +207,17 @@ export function ExposureMap({
       : compact && activeLayers.fire && !activeLayers.no2
         ? FIRE_ACTIVITY_VIEW_STATE
         : INITIAL_VIEW_STATE;
+  const [viewState, setViewState] = useState<MapViewState>(() =>
+    normalizeMapViewState(initialViewState),
+  );
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  useEffect(() => {
+    setViewState(normalizeMapViewState(initialViewState));
+  }, [initialViewState]);
 
   useEffect(() => {
     if (!isClient || !activeLayers.no2) {
@@ -255,6 +272,16 @@ export function ExposureMap({
   if (!isClient) {
     return <MapPanelSkeleton compact={compact} />;
   }
+
+  const zoomMap = (step: number) => {
+    setViewState((current) => ({
+      ...current,
+      zoom: Math.min(
+        INITIAL_VIEW_STATE.maxZoom,
+        Math.max(INITIAL_VIEW_STATE.minZoom, current.zoom + step),
+      ),
+    }));
+  };
 
   const layers = [
     new GeoJsonLayer({
@@ -459,13 +486,13 @@ export function ExposureMap({
             text: `${feature.properties.name}\nNO₂ ${toNo2ColumnValue(feature.properties.no2, "country")} ${NO2_COLUMN_UNIT_LABEL}\nExposure ${Number(feature.properties.exposure).toLocaleString()}`,
           };
         }}
-        initialViewState={initialViewState}
+        onViewStateChange={({ viewState: nextViewState }) => {
+          setViewState(normalizeMapViewState(nextViewState as Partial<MapViewState>));
+        }}
+        viewState={viewState}
         layers={layers}
       >
         <MapLibreMap mapStyle={MAP_STYLE as any} reuseMaps>
-          {controls ? (
-            <NavigationControl position="top-left" showCompass={false} />
-          ) : null}
           {controls ? (
             <ScaleControl
               position={legend === "column" ? "bottom-right" : "bottom-left"}
@@ -473,6 +500,16 @@ export function ExposureMap({
           ) : null}
         </MapLibreMap>
       </DeckGL>
+      {controls ? (
+        <div className="map-zoom-controls" aria-label="Map zoom controls">
+          <button type="button" aria-label="Zoom in" onClick={() => zoomMap(0.5)}>
+            <Plus size={17} aria-hidden />
+          </button>
+          <button type="button" aria-label="Zoom out" onClick={() => zoomMap(-0.5)}>
+            <Minus size={17} aria-hidden />
+          </button>
+        </div>
+      ) : null}
       {legend === "column" ? (
         <>
           <button

@@ -544,6 +544,41 @@ a {
   pointer-events: auto;
 }
 
+.map-zoom-controls {
+  position: absolute;
+  z-index: 20;
+  top: 14px;
+  left: 10px;
+  display: grid;
+  overflow: hidden;
+  width: 34px;
+  border: 1px solid rgba(140, 157, 166, 0.55);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 4px 12px rgba(31, 57, 72, 0.2);
+}
+
+.map-zoom-controls button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 32px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #132535;
+  padding: 0;
+}
+
+.map-zoom-controls button + button {
+  border-top: 1px solid rgba(140, 157, 166, 0.35);
+}
+
+.map-zoom-controls button:hover,
+.map-zoom-controls button:focus-visible {
+  background: #edf6f9;
+}
+
 .tropomi-map-card {
   display: grid;
   grid-template-rows: 40px minmax(0, 1fr);
@@ -2150,7 +2185,7 @@ a {
   }
 
   .explorer-rail {
-    grid-template-columns: 1fr;
+    display: none;
   }
 
   .selector-card {
@@ -2205,9 +2240,25 @@ a {
     width: 100%;
   }
 
+  .map-controls .layer-toggles {
+    display: grid;
+    grid-template-columns: auto repeat(3, minmax(0, 1fr));
+    align-items: center;
+    gap: 6px;
+  }
+
+  .map-controls .layer-title {
+    white-space: nowrap;
+  }
+
   .export-actions button,
   .layer-toggles .toggle {
     flex: 1 1 118px;
+  }
+
+  .map-controls .layer-toggles .toggle {
+    min-width: 0;
+    padding-inline: 6px;
   }
 
   .filter-bar,
@@ -2220,6 +2271,13 @@ a {
   .admin-grid,
   .observatory-footer {
     grid-template-columns: 1fr;
+  }
+
+  .map-controls .filter-bar,
+  .map-controls .filter-bar.compact,
+  .map-controls .range-controls,
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .target-kpi-grid {
@@ -2450,6 +2508,14 @@ a {
 }
 
 @media (max-width: 420px) {
+  .map-controls .layer-toggles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .map-controls .layer-title {
+    display: none;
+  }
+
   .topbar-brand small {
     display: none;
   }

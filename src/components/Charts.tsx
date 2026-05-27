@@ -118,7 +118,7 @@ export function LineChart({
       chart: {
         backgroundColor: "transparent",
         height: "100%",
-        margin: isOverview ? [unit.trim() ? 34 : 24, 12, 42, 42] : hasDualAxis ? [48, 64, 62, 58] : [46, 18, 62, 58],
+        margin: isOverview ? [unit.trim() ? 34 : 24, 12, 52, 42] : hasDualAxis ? [48, 64, 62, 58] : [46, 18, 62, 58],
         spacing: isOverview ? [0, 0, 0, 0] : [8, 8, 6, 8],
         style: { fontFamily: "Arial, Helvetica, sans-serif" },
         type: "line"

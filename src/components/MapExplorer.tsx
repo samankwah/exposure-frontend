@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties } from "react";
+import dynamic from "next/dynamic";
 import { Users, Wind } from "lucide-react";
-import { TargetNpweiMap } from "@/components/TargetNpweiMap";
+import { MapPanelSkeleton } from "@/components/Skeletons";
 import { useObservatoryFilters } from "@/components/ObservatoryContext";
 import type { Filters, Season } from "@/types/exposure";
 import { MONTHS, YEARS } from "@/data/sampleData";
@@ -37,6 +38,21 @@ const COUNTRY_IDS: Record<string, string> = {
 
 type VisualLayerMode = "no2" | "population";
 type BarStyle = CSSProperties & Record<"--bar-width", string>;
+type DeferredTargetMapProps = {
+  layerMode?: VisualLayerMode;
+  month: number;
+  rows: CityNpweiRow[];
+  season: WebDataSeason;
+  year: number;
+};
+
+const DeferredTargetNpweiMap = dynamic<DeferredTargetMapProps>(
+  () => import("@/components/TargetNpweiMap").then((module) => module.TargetNpweiMap),
+  {
+    ssr: false,
+    loading: () => <MapPanelSkeleton />
+  }
+);
 
 export function MapExplorer() {
   const { filters, setFilters } = useObservatoryFilters();
@@ -198,7 +214,7 @@ export function MapExplorer() {
             </div>
           </header>
           <div className="target-map-surface">
-            <TargetNpweiMap
+            <DeferredTargetNpweiMap
               layerMode={visualLayer}
               rows={visibleCityRows.length > 0 ? visibleCityRows : cityRows}
               season={season}

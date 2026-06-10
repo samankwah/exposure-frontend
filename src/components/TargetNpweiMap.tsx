@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import DeckGL from "@deck.gl/react";
 import { GeoJsonLayer } from "@deck.gl/layers";
 import MapLibreMap, { ScaleControl } from "react-map-gl/maplibre";
@@ -64,6 +64,10 @@ type PixelFeature = {
     coordinates: Array<Array<[number, number]>>;
   };
 };
+type PixelFeatureCollection = {
+  type: "FeatureCollection";
+  features: PixelFeature[];
+};
 
 export type TargetMapLayerMode = "no2" | "population";
 
@@ -102,14 +106,31 @@ export function TargetNpweiMap({
   layerMode?: TargetMapLayerMode;
 }) {
   const [isClient, setIsClient] = useState(false);
+  const [surface, setSurface] = useState<PixelFeatureCollection | null>(null);
   const [viewState, setViewState] = useState<MapViewState>(INITIAL_VIEW_STATE);
-  const surface = useMemo(() => getUrbanPixelSurface(rows, season, year, month, layerMode), [rows, season, year, month, layerMode]);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  if (!isClient) return <MapPanelSkeleton />;
+  useEffect(() => {
+    if (!isClient) return;
+
+    let canceled = false;
+    setSurface(null);
+
+    const timeoutId = window.setTimeout(() => {
+      const nextSurface = getUrbanPixelSurface(rows, season, year, month, layerMode);
+      if (!canceled) setSurface(nextSurface);
+    }, 0);
+
+    return () => {
+      canceled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [isClient, layerMode, month, rows, season, year]);
+
+  if (!isClient || !surface) return <MapPanelSkeleton />;
 
   const zoomMap = (step: number) => {
     setViewState((current) => ({
@@ -225,7 +246,13 @@ export function TargetNpweiMap({
   );
 }
 
-function getUrbanPixelSurface(rows: CityNpweiRow[], season: WebDataSeason, year: number, month: number, layerMode: TargetMapLayerMode) {
+function getUrbanPixelSurface(
+  rows: CityNpweiRow[],
+  season: WebDataSeason,
+  year: number,
+  month: number,
+  layerMode: TargetMapLayerMode
+): PixelFeatureCollection {
   if (layerMode === "no2") {
     return getSparseNo2PixelSurface(rows, season, year, month);
   }
@@ -290,10 +317,10 @@ function getUrbanPixelSurface(rows: CityNpweiRow[], season: WebDataSeason, year:
   return {
     type: "FeatureCollection",
     features
-  } as const;
+  };
 }
 
-function getSparseNo2PixelSurface(rows: CityNpweiRow[], season: WebDataSeason, year: number, month: number) {
+function getSparseNo2PixelSurface(rows: CityNpweiRow[], season: WebDataSeason, year: number, month: number): PixelFeatureCollection {
   const features: PixelFeature[] = [];
   const selectedCity = rows.length === 1;
   const cellSize = 0.12;
@@ -355,7 +382,7 @@ function getSparseNo2PixelSurface(rows: CityNpweiRow[], season: WebDataSeason, y
   return {
     type: "FeatureCollection",
     features
-  } as const;
+  };
 }
 
 function getNo2PixelSources(rows: CityNpweiRow[], valueBoost: number, maxUrbanPop: number) {

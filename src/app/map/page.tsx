@@ -1,6 +1,4 @@
 import { MapExplorer } from "@/components/MapExplorer";
-import { BrandedNavbar } from "@/components/BrandedNavbar";
-import { ObservatoryProvider } from "@/components/ObservatoryContext";
 import { createPageMetadata } from "@/app/metadata";
 
 export const metadata = createPageMetadata({
@@ -12,14 +10,5 @@ export const metadata = createPageMetadata({
 });
 
 export default function MapPage() {
-  return (
-    <main className="branded-data-page branded-map-page">
-      <BrandedNavbar />
-      <section className="data-page-shell">
-        <ObservatoryProvider>
-          <MapExplorer />
-        </ObservatoryProvider>
-      </section>
-    </main>
-  );
+  return <MapExplorer />;
 }

@@ -6424,12 +6424,12 @@ button.map-ranking-row.active {
 
 .target-map-kpi-strip {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
 .target-map-kpi-strip .target-map-kpi:last-child {
-  grid-column: 1 / -1;
+  grid-column: auto;
 }
 
 .target-map-kpi {
@@ -6750,6 +6750,10 @@ button.target-city-row.active {
 
   .target-map-kpi-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .target-map-kpi-strip .target-map-kpi:last-child {
+    grid-column: 1 / -1;
   }
 
   .target-map-layout {

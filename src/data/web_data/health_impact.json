@@ -1,0 +1,134 @@
+{
+  "DJF": {
+    "wa_npwei": 49,
+    "wa_risk_tier": "Moderate",
+    "tier_populations_millions": {
+      "Minimal": 20.2,
+      "Low": 22.12,
+      "Moderate": 56.99,
+      "High": 18.79,
+      "Very High": 249.57
+    },
+    "high_risk_population_millions": 268.36,
+    "high_risk_pct_urban": 73.4,
+    "high_risk_countries": [
+      {
+        "country": "Nigeria",
+        "npwei": 100
+      },
+      {
+        "country": "Togo",
+        "npwei": 82
+      },
+      {
+        "country": "Ghana",
+        "npwei": 80
+      },
+      {
+        "country": "Benin",
+        "npwei": 73
+      },
+      {
+        "country": "Guinea",
+        "npwei": 70
+      }
+    ],
+    "n_high_risk_countries": 5,
+    "high_risk_cities": [
+      {
+        "city": "Lagos",
+        "npwei": 100,
+        "country": "Nigeria"
+      }
+    ]
+  },
+  "JJA": {
+    "wa_npwei": 46,
+    "wa_risk_tier": "Moderate",
+    "tier_populations_millions": {
+      "Minimal": 8.88,
+      "Low": 79.98,
+      "Moderate": 4.6,
+      "High": 19.29,
+      "Very High": 254.92
+    },
+    "high_risk_population_millions": 274.21,
+    "high_risk_pct_urban": 75.0,
+    "high_risk_countries": [
+      {
+        "country": "Niger",
+        "npwei": 100
+      },
+      {
+        "country": "Senegal",
+        "npwei": 97
+      },
+      {
+        "country": "Nigeria",
+        "npwei": 94
+      },
+      {
+        "country": "Mali",
+        "npwei": 83
+      },
+      {
+        "country": "Burkina Faso",
+        "npwei": 60
+      }
+    ],
+    "n_high_risk_countries": 5,
+    "high_risk_cities": [
+      {
+        "city": "Lagos",
+        "npwei": 100,
+        "country": "Nigeria"
+      },
+      {
+        "city": "Kano",
+        "npwei": 68,
+        "country": "Nigeria"
+      },
+      {
+        "city": "Maiduguri",
+        "npwei": 60,
+        "country": "Nigeria"
+      },
+      {
+        "city": "Dakar",
+        "npwei": 66,
+        "country": "Senegal"
+      }
+    ]
+  },
+  "Annual": {
+    "wa_npwei": 40,
+    "wa_risk_tier": "Moderate",
+    "tier_populations_millions": {
+      "Minimal": 5.03,
+      "Low": 65.57,
+      "Moderate": 72.36,
+      "High": 14.1,
+      "Very High": 210.61
+    },
+    "high_risk_population_millions": 224.71,
+    "high_risk_pct_urban": 61.5,
+    "high_risk_countries": [
+      {
+        "country": "Nigeria",
+        "npwei": 100
+      },
+      {
+        "country": "Mali",
+        "npwei": 61
+      }
+    ],
+    "n_high_risk_countries": 2,
+    "high_risk_cities": [
+      {
+        "city": "Lagos",
+        "npwei": 100,
+        "country": "Nigeria"
+      }
+    ]
+  }
+}

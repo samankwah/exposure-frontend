@@ -70,6 +70,6 @@ function normalizeFilters(filters: ObservatoryFilters): ObservatoryFilters {
     ...filters,
     startYear,
     endYear,
-    year: endYear
+    year: Math.min(endYear, Math.max(startYear, filters.year))
   };
 }

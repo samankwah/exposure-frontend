@@ -1,0 +1,30 @@
+{
+  "wa_pwe_djf": 1786821917959634.0,
+  "wa_pwe_jja": 1136710024348898.2,
+  "wa_pwe_annual": 1388732504796697.5,
+  "years_covered": [
+    2020,
+    2021,
+    2022,
+    2023,
+    2024
+  ],
+  "urban_threshold_people_per_km2": 50,
+  "total_urban_population": 365582144.88427734,
+  "total_population": 409611394.6075883,
+  "months_by_year": {
+    "2020": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    "2021": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    "2022": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    "2023": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    "2024": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  },
+  "partial_years": {},
+  "no2_units": "molec cm-2",
+  "no2_variable": "Tropospheric_NO2",
+  "population_source": "GPW v4 population count 2020",
+  "formula": "PWE = sum(NO2_i * Pop_i) / sum(Pop_i)",
+  "npwei_formula": "NPWEI = ((PWE - PWEmin) / (PWEmax - PWEmin)) * 100",
+  "normalization_scope": "per season and per collection",
+  "runtime_source": "cached JSON"
+}

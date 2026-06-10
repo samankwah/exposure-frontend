@@ -5,11 +5,15 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    webpackBuildWorker: false
+  },
   outputFileTracingRoot: projectRoot,
   transpilePackages: [
     "@deck.gl/core",
     "@deck.gl/layers",
     "@deck.gl/react",
+    "maplibre-gl",
     "react-map-gl"
   ]
 };

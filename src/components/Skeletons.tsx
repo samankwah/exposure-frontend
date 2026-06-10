@@ -47,25 +47,6 @@ export function MapPanelSkeleton({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function DashboardSkeleton() {
-  return (
-    <LoadingRegion label="Loading dashboard content" className="page-stack overview-page">
-      <TargetKpiGridSkeleton />
-      <section className="dashboard-grid overview-main-grid">
-        <OverviewMapSkeleton />
-        <PopulationTableSkeleton />
-      </section>
-      <section className="overview-bottom-grid">
-        <ChartCardSkeleton />
-        <ChartCardSkeleton variant="bars" />
-        <FireCardSkeleton />
-        <InsightsSkeleton />
-      </section>
-      <FooterSkeleton />
-    </LoadingRegion>
-  );
-}
-
 export function MapPageSkeleton() {
   return (
     <LoadingRegion label="Loading map explorer" className="page-stack map-page">
@@ -107,72 +88,6 @@ export function TrendsSkeleton() {
   );
 }
 
-export function FireSeasonalitySkeleton() {
-  return (
-    <LoadingRegion label="Loading fire and seasonality analysis" className="page-stack">
-      <PageHeaderSkeleton action />
-      <FilterBarSkeleton />
-      <KpiGridSkeleton />
-      <section className="chart-grid two">
-        <ChartCardSkeleton variant="bars" />
-        <ChartCardSkeleton />
-        <ChartCardSkeleton />
-      </section>
-    </LoadingRegion>
-  );
-}
-
-export function ReportsSkeleton() {
-  return (
-    <LoadingRegion label="Loading reports workspace" className="page-stack reports-page">
-      <PageHeaderSkeleton action />
-      <FilterBarSkeleton />
-      <section className="report-layout">
-        <article className="report-preview skeleton-report-preview">
-          <SkeletonLine width="132px" className="skeleton-eyebrow-line" />
-          <SkeletonLine width="58%" className="skeleton-title-line" />
-          <SkeletonLine />
-          <SkeletonLine width="92%" />
-          <SkeletonLine width="76%" />
-          <div className="skeleton-list">
-            <SkeletonLine width="82%" />
-            <SkeletonLine width="70%" />
-            <SkeletonLine width="74%" />
-          </div>
-        </article>
-        <aside className="report-actions">
-          <ExportActionsSkeleton />
-          <RankingTableSkeleton compact />
-        </aside>
-      </section>
-    </LoadingRegion>
-  );
-}
-
-export function AdminSkeleton() {
-  return (
-    <LoadingRegion label="Loading admin workspace" className="page-stack">
-      <PageHeaderSkeleton />
-      <section className="admin-grid">
-        {Array.from({ length: 4 }, (_, index) => (
-          <article className="admin-card skeleton-admin-card" key={index}>
-            <SkeletonBlock className="skeleton-icon" />
-            <SkeletonLine width="72%" />
-            <SkeletonLine width="42%" />
-            <SkeletonPill />
-          </article>
-        ))}
-      </section>
-      <article className="ops-log">
-        <SkeletonLine width="112px" className="skeleton-eyebrow-line" />
-        <SkeletonLine width="68%" />
-        <SkeletonLine width="76%" />
-        <SkeletonLine width="62%" />
-      </article>
-    </LoadingRegion>
-  );
-}
-
 function PageHeaderSkeleton({ action = false }: { action?: boolean }) {
   return (
     <header className="page-header skeleton-page-header">
@@ -188,22 +103,6 @@ function PageHeaderSkeleton({ action = false }: { action?: boolean }) {
         </div>
       ) : null}
     </header>
-  );
-}
-
-function TargetKpiGridSkeleton() {
-  return (
-    <section className="target-kpi-grid">
-      {Array.from({ length: 5 }, (_, index) => (
-        <article className="target-kpi-card skeleton-target-kpi" key={index}>
-          <SkeletonLine width="72%" />
-          <SkeletonBlock className="skeleton-kpi-icon" />
-          <SkeletonLine width="54%" className="skeleton-metric-line" />
-          <SkeletonLine width="68%" />
-          <SkeletonLine width="48%" />
-        </article>
-      ))}
-    </section>
   );
 }
 
@@ -243,49 +142,6 @@ function LayerToggleSkeleton() {
       <SkeletonPill width="74px" />
       <SkeletonPill width="104px" />
     </div>
-  );
-}
-
-function OverviewMapSkeleton() {
-  return (
-    <article className="tropomi-map-card skeleton-card">
-      <header className="tropomi-map-header">
-        <SkeletonLine width="290px" />
-        <div className="map-selectors">
-          <SkeletonPill width="134px" />
-          <SkeletonPill width="134px" />
-          <SkeletonPill width="34px" />
-        </div>
-      </header>
-      <div className="tropomi-map-body">
-        <MapPanelSkeleton compact />
-      </div>
-    </article>
-  );
-}
-
-function PopulationTableSkeleton() {
-  return (
-    <article className="population-table-card skeleton-card">
-      <header>
-        <SkeletonLine width="70%" />
-      </header>
-      <div className="population-table skeleton-population-table">
-        {Array.from({ length: 16 }, (_, index) => (
-          <div className="population-row" key={index}>
-            <SkeletonLine width={index === 0 ? "52px" : "78px"} />
-            <span className="no2-bar-cell">
-              <SkeletonBlock className="skeleton-table-bar" />
-              <SkeletonLine width="28px" />
-            </span>
-            <SkeletonLine width={index === 0 ? "82px" : "42px"} />
-          </div>
-        ))}
-      </div>
-      <footer>
-        <SkeletonLine width="78%" />
-      </footer>
-    </article>
   );
 }
 
@@ -336,71 +192,5 @@ function ChartCardSkeleton({ variant = "line" }: { variant?: "line" | "bars" }) 
         )}
       </div>
     </article>
-  );
-}
-
-function FireCardSkeleton() {
-  return (
-    <article className="chart-card fire-card target-fire-card skeleton-card">
-      <header className="panel-header">
-        <SkeletonLine width="140px" />
-        <SkeletonLine width="94px" />
-      </header>
-      <div className="fire-mini-map target-fire-map">
-        <MapPanelSkeleton compact />
-      </div>
-      <div className="target-fire-footer">
-        <SkeletonPill width="92px" />
-        <SkeletonLine width="26px" />
-        <SkeletonBlock className="skeleton-table-bar" />
-        <SkeletonLine width="28px" />
-      </div>
-    </article>
-  );
-}
-
-function InsightsSkeleton() {
-  return (
-    <article className="chart-card insights-card target-insights skeleton-card">
-      <header className="panel-header">
-        <SkeletonLine width="88px" />
-      </header>
-      <div className="insight-list">
-        {Array.from({ length: 4 }, (_, index) => (
-          <p key={index}>
-            <SkeletonBlock className="skeleton-insight-icon" />
-            <SkeletonLine width={`${74 + (index % 2) * 14}%`} />
-          </p>
-        ))}
-      </div>
-    </article>
-  );
-}
-
-function ExportActionsSkeleton() {
-  return (
-    <div className="export-actions skeleton-export-actions">
-      <SkeletonPill width="96px" />
-      <SkeletonPill width="96px" />
-      <SkeletonPill width="96px" />
-    </div>
-  );
-}
-
-function FooterSkeleton() {
-  return (
-    <footer className="observatory-footer skeleton-footer">
-      {Array.from({ length: 3 }, (_, index) => (
-        <section key={index}>
-          <SkeletonBlock className="skeleton-footer-icon" />
-          <h2>
-            <SkeletonLine width="112px" />
-          </h2>
-          <p>
-            <SkeletonLine width="86%" />
-          </p>
-        </section>
-      ))}
-    </footer>
   );
 }

@@ -1,0 +1,107 @@
+{
+  "Senegal": {
+    "DJF": 1337519917982168.5,
+    "JJA": 1284369063158675.2,
+    "Annual": 1249848662312960.5,
+    "urban_population_millions": 12.21,
+    "total_population_millions": null
+  },
+  "Mali": {
+    "DJF": 1273065153661897.5,
+    "JJA": 1192670523128818.0,
+    "Annual": 1292403989384339.0,
+    "urban_population_millions": 14.1,
+    "total_population_millions": null
+  },
+  "Mauritania": {
+    "DJF": 850816018951413.8,
+    "JJA": 929880440846297.1,
+    "Annual": 904931971838329.8,
+    "urban_population_millions": 2.2,
+    "total_population_millions": null
+  },
+  "Benin": {
+    "DJF": 1720087611134182.5,
+    "JJA": 876955591872622.2,
+    "Annual": 1189664451178968.0,
+    "urban_population_millions": 10.72,
+    "total_population_millions": null
+  },
+  "Niger": {
+    "DJF": 720122732708826.5,
+    "JJA": 1301368672627651.2,
+    "Annual": 981891690935373.9,
+    "urban_population_millions": 18.0,
+    "total_population_millions": null
+  },
+  "Nigeria": {
+    "DJF": 2096266795965917.0,
+    "JJA": 1259984177497083.8,
+    "Annual": 1586079109158747.2,
+    "urban_population_millions": 210.61,
+    "total_population_millions": null
+  },
+  "Togo": {
+    "DJF": 1846374567349917.8,
+    "JJA": 821721137794993.4,
+    "Annual": 1182761733448595.0,
+    "urban_population_millions": 8.78,
+    "total_population_millions": null
+  },
+  "Ghana": {
+    "DJF": 1822532779743224.5,
+    "JJA": 826423577072400.9,
+    "Annual": 1186037108959672.5,
+    "urban_population_millions": 30.18,
+    "total_population_millions": null
+  },
+  "C\u00f4te d'Ivoire": {
+    "DJF": 1430075883302688.0,
+    "JJA": 856453418622454.4,
+    "Annual": 1093421003830044.4,
+    "urban_population_millions": 22.23,
+    "total_population_millions": null
+  },
+  "Guinea": {
+    "DJF": 1683978863450863.8,
+    "JJA": 796350128483749.5,
+    "Annual": 1165076100268126.8,
+    "urban_population_millions": 8.07,
+    "total_population_millions": null
+  },
+  "Guinea-Bissau": {
+    "DJF": 1328424812923379.8,
+    "JJA": 745515808078675.0,
+    "Annual": 974744454746980.6,
+    "urban_population_millions": 1.19,
+    "total_population_millions": null
+  },
+  "Liberia": {
+    "DJF": 1041038499368987.5,
+    "JJA": 644071229466275.5,
+    "Annual": 824550166909557.9,
+    "urban_population_millions": 2.83,
+    "total_population_millions": null
+  },
+  "Sierra Leone": {
+    "DJF": 1364500010220338.5,
+    "JJA": 691974008183970.9,
+    "Annual": 1039329735320550.1,
+    "urban_population_millions": 4.86,
+    "total_population_millions": null
+  },
+  "Burkina Faso": {
+    "DJF": 1075919972913563.0,
+    "JJA": 1037840589618129.4,
+    "Annual": 1088633877463672.6,
+    "urban_population_millions": 19.29,
+    "total_population_millions": null
+  },
+  "Gambia": {
+    "DJF": 1409970769387369.5,
+    "JJA": 958899570862727.4,
+    "Annual": 1160358891135202.0,
+    "urban_population_millions": 2.4,
+    "total_population_millions": null
+  }
+}

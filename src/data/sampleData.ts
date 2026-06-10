@@ -6,6 +6,8 @@ import type {
   FireActivityPoint,
   Hotspot,
   InterpolatedNo2Cell,
+  MapCityRankingRow,
+  MapMetricMode,
   MonthlyMetric,
   RankingRow,
   Season,
@@ -306,6 +308,16 @@ export const HOTSPOTS: Hotspot[] = GENERATED_HOTSPOTS.concat([
     category: "industrial"
   }
 ]);
+
+const CITY_HOTSPOTS = HOTSPOTS.filter(
+  (hotspot): hotspot is Hotspot & { cityId: string } => Boolean(hotspot.cityId)
+);
+
+const NPWEI_COMPONENT_MAXES = {
+  fireIntensity: Math.max(1, ...CITY_HOTSPOTS.map((hotspot) => hotspot.fireIntensity)),
+  no2: Math.max(1, ...CITY_HOTSPOTS.map((hotspot) => hotspot.no2)),
+  populationExposure: Math.max(1, ...CITY_HOTSPOTS.map((hotspot) => hotspot.populationExposure))
+};
 
 export const FIRE_ACTIVITY_POINTS: FireActivityPoint[] = COUNTRIES.flatMap((country, countryIndex) => {
   const longitudes = country.polygon.map(([longitude]) => longitude);
@@ -832,6 +844,166 @@ export function getOverviewMetrics(filters: Filters): SummaryMetric[] {
       detail: NO2_COLUMN_UNIT_LABEL
     }
   ];
+}
+
+export function getNpweiValue(filters: Filters, cityId: string) {
+  const city = CITIES.find((item) => item.id === cityId);
+  const hotspot = getCityHotspot(cityId);
+
+  if (!city || !hotspot) return 0;
+
+  const componentScore =
+    (hotspot.no2 / NPWEI_COMPONENT_MAXES.no2) * 46 +
+    (hotspot.populationExposure / NPWEI_COMPONENT_MAXES.populationExposure) * 42 +
+    (hotspot.fireIntensity / NPWEI_COMPONENT_MAXES.fireIntensity) * 12;
+  const temporalMultiplier = getTemporalNo2Multiplier(filters, city.countryId);
+
+  return clamp(round(componentScore * temporalMultiplier, 0), 0, 100);
+}
+
+export function getMapCityRanking(filters: Filters, metricMode: MapMetricMode): MapCityRankingRow[] {
+  const countryIds = new Set(getCountriesForFilter(filters).map((country) => country.id));
+
+  return CITIES.filter((city) => countryIds.has(city.countryId))
+    .filter((city) => filters.cityId === "all" || city.id === filters.cityId)
+    .map((city) => {
+      const country = COUNTRIES.find((item) => item.id === city.countryId);
+      const value = metricMode === "npwei" ? getNpweiValue(filters, city.id) : getCityNo2ColumnValue(filters, city.id);
+
+      return {
+        id: city.id,
+        city: city.name,
+        country: country?.name ?? "West Africa",
+        countryId: city.countryId,
+        population: city.population,
+        value
+      };
+    })
+    .sort((a, b) => b.value - a.value || b.population - a.population);
+}
+
+export function getMapKpis(filters: Filters, metricMode: MapMetricMode): SummaryMetric[] {
+  const rows = getMapCityRanking(filters, metricMode);
+  const previousRows = getMapCityRanking({ ...filters, year: Math.max(YEARS[0], filters.year - 1) }, metricMode);
+  const values = rows.map((row) => row.value);
+  const previousValues = previousRows.map((row) => row.value);
+  const mean = average(values);
+  const previousMean = average(previousValues);
+  const topCity = rows[0];
+  const min = values.length > 0 ? Math.min(...values) : 0;
+  const max = values.length > 0 ? Math.max(...values) : 0;
+  const highThreshold = metricMode === "npwei" ? 60 : 6;
+  const highRows = rows.filter((row) => row.value >= highThreshold);
+  const previousHighRows = previousRows.filter((row) => row.value >= highThreshold);
+  const highPopulation = round(sum(highRows.map((row) => row.population)) / 1_000_000, 1);
+
+  if (metricMode === "npwei") {
+    return [
+      {
+        label: "Mean NPWEI",
+        value: `${round(mean, 0)}/100`,
+        delta: round(mean - previousMean, 0),
+        tone: "cyan",
+        detail: "Population-weighted exposure index"
+      },
+      {
+        label: "Highest exposure city",
+        value: topCity ? `${topCity.city} ${round(topCity.value, 0)}` : "No data",
+        delta: round((topCity?.value ?? 0) - mean, 0),
+        tone: "rose",
+        detail: topCity ? `${topCity.country} city hotspot` : "No city selected"
+      },
+      {
+        label: "High-risk cities",
+        value: String(highRows.length),
+        delta: highRows.length - previousHighRows.length,
+        tone: "amber",
+        detail: "Cities at or above 60/100 NPWEI"
+      },
+      {
+        label: "High-risk population",
+        value: `${highPopulation.toLocaleString()}M`,
+        delta: round(highPopulation * 0.04, 1),
+        tone: "lime",
+        detail: "Urban population in high-risk cities"
+      },
+      {
+        label: "NPWEI score range",
+        value: `${round(min, 0)}-${round(max, 0)}`,
+        delta: round(max - min, 0),
+        tone: "cyan",
+        detail: "Normalized 0-100 exposure score"
+      }
+    ];
+  }
+
+  return [
+    {
+      label: "Mean NO\u2082 column",
+      value: mean.toFixed(2),
+      delta: round(mean - previousMean, 2),
+      tone: "cyan",
+      detail: NO2_COLUMN_UNIT_LABEL
+    },
+    {
+      label: "Highest NO\u2082 city",
+      value: topCity ? `${topCity.city} ${topCity.value.toFixed(2)}` : "No data",
+      delta: round((topCity?.value ?? 0) - mean, 2),
+      tone: "rose",
+      detail: topCity ? `${topCity.country} urban column` : "No city selected"
+    },
+    {
+      label: "High-column cities",
+      value: String(highRows.length),
+      delta: highRows.length - previousHighRows.length,
+      tone: "amber",
+      detail: `Cities at or above ${highThreshold.toFixed(1)}`
+    },
+    {
+      label: "High-column population",
+      value: `${highPopulation.toLocaleString()}M`,
+      delta: round(highPopulation * 0.03, 1),
+      tone: "lime",
+      detail: "Urban population in high-column cities"
+    },
+    {
+      label: "NO\u2082 column range",
+      value: `${min.toFixed(2)}-${max.toFixed(2)}`,
+      delta: round(max - min, 2),
+      tone: "cyan",
+      detail: NO2_COLUMN_UNIT_LABEL
+    }
+  ];
+}
+
+function getCityHotspot(cityId: string) {
+  return CITY_HOTSPOTS.find((hotspot) => hotspot.cityId === cityId);
+}
+
+function getCityNo2ColumnValue(filters: Filters, cityId: string) {
+  const city = CITIES.find((item) => item.id === cityId);
+  const hotspot = getCityHotspot(cityId);
+
+  if (!city || !hotspot) return 0;
+
+  return round(toNo2ColumnValue(hotspot.no2 * getTemporalNo2Multiplier(filters, city.countryId), "hotspot"), 2);
+}
+
+function getTemporalNo2Multiplier(filters: Filters, countryId: string) {
+  const currentNo2 = average(getMonthlyMetrics({ ...filters, countryId, cityId: "all" }).map((metric) => metric.no2));
+  const referenceNo2 = average(
+    getMonthlyMetrics({
+      ...DEFAULT_FILTERS,
+      countryId,
+      cityId: "all",
+      month: "all",
+      season: "all"
+    }).map((metric) => metric.no2)
+  );
+
+  if (currentNo2 === 0 || referenceNo2 === 0) return 1;
+
+  return clamp(currentNo2 / referenceNo2, 0.82, 1.18);
 }
 
 export function getCountryRanking(filters: Filters): RankingRow[] {

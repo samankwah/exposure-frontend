@@ -1,5 +1,6 @@
 export type Season = "all" | "dry" | "wet";
 export type LayerKey = "no2" | "fire" | "population";
+export type MapMetricMode = "npwei" | "no2";
 
 export interface Country {
   id: string;
@@ -97,6 +98,15 @@ export interface RankingRow {
   exposure: number;
   fireCount: number;
   hotspotShare: number;
+}
+
+export interface MapCityRankingRow {
+  id: string;
+  city: string;
+  country: string;
+  countryId: string;
+  value: number;
+  population: number;
 }
 
 export interface TrendPoint {

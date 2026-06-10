@@ -1,9 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import Chart from "chart.js/auto";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
+import type { Chart as ChartInstance, ChartConfiguration, ChartTypeRegistry } from "chart.js";
 import type { HighchartsReactRefObject } from "highcharts-react-official";
+import {
+  getCityRows,
+  getCountryRows,
+  getHealthRiskTierRows,
+  getSeasonalTrendRows
+} from "@/data/webData";
+import type { WebDataSeason } from "@/data/webData";
+import { useWebDataVersion } from "@/data/useWebData";
 import type { TrendPoint } from "@/types/exposure";
 
 type MetricKey = "no2" | "fireCount" | "exposure" | "dry" | "wet";
@@ -44,6 +54,49 @@ const axisTitleStyle = {
   fontWeight: "700"
 };
 
+const insightsFont = {
+  family: "Sora, Arial, Helvetica, sans-serif"
+};
+
+const countryRanking = [
+  ["Nigeria", 100],
+  ["Mali", 61],
+  ["Senegal", 56],
+  ["Benin", 48],
+  ["Togo", 47],
+  ["Ghana", 47],
+  ["Guinea", 45],
+  ["Gambia", 44],
+  ["Côte d'Ivoire", 35],
+  ["Burkina Faso", 35],
+  ["Sierra Leone", 28],
+  ["Niger", 21],
+  ["Guinea-Bissau", 20],
+  ["Mauritania", 11],
+  ["Liberia", 0]
+] as const;
+
+const cityHotspots = [
+  ["Lagos", 100],
+  ["Abuja", 49],
+  ["Ibadan", 44],
+  ["Abidjan", 42],
+  ["Bamako", 39],
+  ["Port Harcourt", 35],
+  ["Aba", 35],
+  ["Onitsha", 34],
+  ["Kano", 32],
+  ["Enugu", 31]
+] as const;
+
+function riskColor(score: number) {
+  if (score < 20) return "#22c55e";
+  if (score < 40) return "#84cc16";
+  if (score < 60) return "#eab308";
+  if (score < 80) return "#f97316";
+  return "#ef4444";
+}
+
 function ResponsiveHighcharts({ options }: { options: Highcharts.Options }) {
   const chartRef = useRef<HighchartsReactRefObject>(null);
 
@@ -83,6 +136,437 @@ function ResponsiveHighcharts({ options }: { options: Highcharts.Options }) {
       ref={chartRef}
     />
   );
+}
+
+function ChartJsChart<TType extends keyof ChartTypeRegistry>({
+  ariaLabel,
+  className = "",
+  config
+}: {
+  ariaLabel: string;
+  className?: string;
+  config: ChartConfiguration<TType>;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<ChartInstance<TType> | null>(null);
+
+  useEffect(() => {
+    const context = canvasRef.current?.getContext("2d");
+    if (!context) return;
+
+    chartRef.current = new Chart(context, config);
+
+    return () => {
+      chartRef.current?.destroy();
+      chartRef.current = null;
+    };
+  }, [config]);
+
+  return (
+    <div className={`insights-chartjs ${className}`}>
+      <canvas aria-label={ariaLabel} ref={canvasRef} role="img" />
+    </div>
+  );
+}
+
+export function AnnualNpweiTrendChart() {
+  const dataVersion = useWebDataVersion();
+  const seasonalRows = useMemo(() => {
+    void dataVersion;
+    return getSeasonalTrendRows();
+  }, [dataVersion]);
+  const config = useMemo<ChartConfiguration<"line">>(
+    () => ({
+      type: "line",
+      data: {
+        labels: seasonalRows.map((row) => row.year),
+        datasets: [
+          {
+            label: "Annual",
+            data: seasonalRows.map((row) => row.Annual),
+            borderColor: "#2563eb",
+            backgroundColor: "rgba(37,99,235,.08)",
+            fill: true,
+            tension: 0.35,
+            pointRadius: 4,
+            pointHoverRadius: 4,
+            pointBackgroundColor: "#ffffff",
+            pointBorderColor: "#2563eb",
+            pointBorderWidth: 2,
+            borderWidth: 2.5
+          },
+          {
+            label: "DJF (Dry)",
+            data: seasonalRows.map((row) => row.DJF),
+            borderColor: "#f97316",
+            backgroundColor: "transparent",
+            tension: 0.35,
+            pointRadius: 3,
+            pointHoverRadius: 3,
+            pointBackgroundColor: "#ffffff",
+            pointBorderColor: "#f97316",
+            pointBorderWidth: 2,
+            borderWidth: 1.8,
+            borderDash: [5, 4]
+          },
+          {
+            label: "JJA (Wet)",
+            data: seasonalRows.map((row) => row.JJA),
+            borderColor: "#22c55e",
+            backgroundColor: "transparent",
+            tension: 0.35,
+            pointRadius: 3,
+            pointHoverRadius: 3,
+            pointBackgroundColor: "#ffffff",
+            pointBorderColor: "#22c55e",
+            pointBorderWidth: 2,
+            borderWidth: 1.8,
+            borderDash: [5, 4]
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: "bottom",
+            labels: {
+              boxWidth: 10,
+              padding: 8,
+              color: "#64748b",
+              font: {
+                ...insightsFont,
+                size: 9,
+                weight: "500"
+              },
+              usePointStyle: false
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                return `${context.dataset.label}: ${context.parsed.y}/100`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: "#f1f5f9" },
+            border: { display: false },
+            ticks: {
+              color: "#64748b",
+              font: {
+                ...insightsFont,
+                size: 9
+              }
+            }
+          },
+          y: {
+            grid: { color: "#f1f5f9" },
+            border: { display: false },
+            min: 0,
+            max: 100,
+            ticks: {
+              stepSize: 20,
+              color: "#64748b",
+              font: {
+                ...insightsFont,
+                size: 9
+              }
+            }
+          }
+        }
+      }
+    }),
+    [seasonalRows]
+  );
+
+  return <ChartJsChart ariaLabel="Yearly NPWEI trend" config={config} />;
+}
+
+export function CountryRankingChart({ season = "Annual" }: { season?: WebDataSeason }) {
+  const dataVersion = useWebDataVersion();
+  const annualCountryRanking = useMemo(() => {
+    void dataVersion;
+    return getCountryRows(season);
+  }, [dataVersion, season]);
+  const config = useMemo<ChartConfiguration<"bar">>(
+    () => ({
+      type: "bar",
+      data: {
+        labels: annualCountryRanking.map((row) => (row.country.length > 12 ? `${row.country.slice(0, 11)}...` : row.country)),
+        datasets: [
+          {
+            data: annualCountryRanking.map((row) => row.npwei),
+            backgroundColor: annualCountryRanking.map((row) => row.riskColor),
+            borderRadius: 4,
+            borderSkipped: false
+          }
+        ]
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                return `NPWEI: ${context.parsed.x}/100`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: "#f1f5f9" },
+            border: { display: false },
+            min: 0,
+            max: 100,
+            ticks: {
+              color: "#64748b",
+              font: { ...insightsFont, size: 9 }
+            }
+          },
+          y: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: {
+              color: "#64748b",
+              font: { ...insightsFont, size: 9 }
+            }
+          }
+        }
+      }
+    }),
+    [annualCountryRanking]
+  );
+
+  return <ChartJsChart ariaLabel="Country NPWEI ranking" config={config} />;
+}
+
+export function SeasonalCycleChart() {
+  const config = useMemo<ChartConfiguration<"line">>(
+    () => ({
+      type: "line",
+      data: {
+        labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+        datasets: [
+          {
+            label: "Dry (Nov-May)",
+            data: [85, 90, 82, 75, 65, 45, 35, 30, 35, 50, 65, 80],
+            borderColor: "#f97316",
+            backgroundColor: "rgba(249,115,22,.08)",
+            fill: true,
+            tension: 0.45,
+            pointRadius: 3,
+            pointHoverRadius: 3,
+            pointBackgroundColor: "#ffffff",
+            pointBorderColor: "#f97316",
+            pointBorderWidth: 2,
+            borderWidth: 2.5
+          },
+          {
+            label: "Wet (Jun-Oct)",
+            data: [45, 40, 42, 48, 55, 68, 74, 70, 66, 58, 55, 48],
+            borderColor: "#22c55e",
+            backgroundColor: "rgba(34,197,94,.08)",
+            fill: true,
+            tension: 0.45,
+            pointRadius: 3,
+            pointHoverRadius: 3,
+            pointBackgroundColor: "#ffffff",
+            pointBorderColor: "#22c55e",
+            pointBorderWidth: 2,
+            borderWidth: 1.8,
+            borderDash: [5, 4]
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: "bottom",
+            labels: {
+              boxWidth: 10,
+              padding: 8,
+              color: "#64748b",
+              font: {
+                ...insightsFont,
+                size: 9,
+                weight: "500"
+              }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                return `NPWEI: ${context.parsed.y}/100`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: {
+              color: "#64748b",
+              font: { ...insightsFont, size: 8 }
+            }
+          },
+          y: {
+            grid: { color: "#f1f5f9" },
+            border: { display: false },
+            min: 0,
+            max: 100,
+            ticks: {
+              stepSize: 20,
+              color: "#64748b",
+              font: { ...insightsFont, size: 9 }
+            }
+          }
+        }
+      }
+    }),
+    []
+  );
+
+  return <ChartJsChart ariaLabel="Monthly NPWEI seasonal cycle" config={config} />;
+}
+
+export function CityHotspotsChart({
+  country = "all",
+  limit = 10,
+  season = "Annual"
+}: {
+  country?: string;
+  limit?: number;
+  season?: WebDataSeason;
+}) {
+  const dataVersion = useWebDataVersion();
+  const annualCityHotspots = useMemo(
+    () => {
+      void dataVersion;
+      return getCityRows(season)
+        .filter((row) => country === "all" || row.country === country)
+        .slice(0, limit);
+    },
+    [country, dataVersion, limit, season]
+  );
+  const config = useMemo<ChartConfiguration<"bar">>(
+    () => ({
+      type: "bar",
+      data: {
+        labels: annualCityHotspots.map((row) => row.name),
+        datasets: [
+          {
+            data: annualCityHotspots.map((row) => row.npwei),
+            backgroundColor: annualCityHotspots.map((row) => row.riskColor),
+            borderRadius: 5,
+            borderSkipped: false
+          }
+        ]
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                return `NPWEI: ${context.parsed.x}/100`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: "#f1f5f9" },
+            border: { display: false },
+            min: 0,
+            max: 100,
+            ticks: {
+              color: "#64748b",
+              font: { ...insightsFont, size: 9 }
+            }
+          },
+          y: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: {
+              color: "#64748b",
+              font: { ...insightsFont, size: 10, weight: "600" }
+            }
+          }
+        }
+      }
+    }),
+    [annualCityHotspots]
+  );
+
+  return <ChartJsChart ariaLabel="Top city NPWEI hotspots" className="large" config={config} />;
+}
+
+export function RiskTierChart() {
+  const dataVersion = useWebDataVersion();
+  const annualRiskTiers = useMemo(() => {
+    void dataVersion;
+    return getHealthRiskTierRows("Annual");
+  }, [dataVersion]);
+  const config = useMemo<ChartConfiguration<"doughnut">>(
+    () => ({
+      type: "doughnut",
+      data: {
+        labels: annualRiskTiers.map((row) => row.label),
+        datasets: [
+          {
+            data: annualRiskTiers.map((row) => row.populationMillions),
+            backgroundColor: annualRiskTiers.map((row) => row.color),
+            borderColor: "#ffffff",
+            borderWidth: 3,
+            hoverOffset: 8
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "62%",
+        plugins: {
+          legend: {
+            display: true,
+            position: "bottom",
+            labels: {
+              boxWidth: 12,
+              padding: 10,
+              color: "#64748b",
+              font: { ...insightsFont, size: 10 }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                return `${context.label}: ${context.raw}M people`;
+              }
+            }
+          }
+        }
+      }
+    }),
+    [annualRiskTiers]
+  );
+
+  return <ChartJsChart ariaLabel="Population by NPWEI risk tier" className="large" config={config} />;
 }
 
 function formatChartValue(value: number) {

@@ -20,6 +20,7 @@
   --amber: #c78316;
   --rose: #c6473d;
   --shadow: 0 14px 38px rgba(31, 57, 72, 0.12);
+  --site-content-max: 1690px;
 }
 
 * {
@@ -11160,12 +11161,17 @@ button.target-city-row.active {
 .trends-dashboard-inner,
 .about-dashboard-inner,
 .contact-dashboard-inner,
-.insights-detail-shell,
+.insights-detail-inner,
 .home-insights-inner,
 .home-methodology-inner,
-.home-risk-inner {
+.home-risk-inner,
+.map-workspace,
+.target-map-page {
   min-width: 0;
-  max-width: 100%;
+  width: 100%;
+  max-width: var(--site-content-max);
+  margin-right: auto;
+  margin-left: auto;
 }
 
 .data-page-heading h1,

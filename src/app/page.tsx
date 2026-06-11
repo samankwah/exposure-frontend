@@ -144,11 +144,6 @@ export default function Home() {
               <ArrowRight className="home-cta-arrow" size={18} strokeWidth={2.5} aria-hidden />
             </Link>
           </div>
-
-          <p className="home-audience">
-            <UsersRound size={23} aria-hidden />
-            <span>For policymakers, analysts, researchers, and the public</span>
-          </p>
         </div>
 
         <div className="home-metrics" aria-label="Platform metrics">

@@ -3359,22 +3359,6 @@ body.mobile-nav-open {
   box-shadow: none;
 }
 
-.home-audience {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin: 24px 0 0;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 1rem;
-  line-height: 1.35;
-  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.4);
-}
-
-.home-audience svg {
-  flex: 0 0 auto;
-}
-
 .home-metrics {
   position: absolute;
   right: 54px;
@@ -4642,20 +4626,6 @@ body.mobile-nav-open {
   .home-cta-arrow {
     width: 16px;
     height: 16px;
-  }
-
-  .home-audience {
-    align-items: flex-start;
-    justify-content: center;
-    margin-top: 18px;
-    font-size: 0.9rem;
-    line-height: 1.28;
-    text-align: center;
-  }
-
-  .home-audience svg {
-    width: 20px;
-    height: 20px;
   }
 
   .home-metrics {
@@ -11368,10 +11338,6 @@ button.target-city-row.active {
   .home-actions {
     gap: 12px;
     margin-top: 24px;
-  }
-
-  .home-audience {
-    margin-top: 14px;
   }
 
   .home-metrics {

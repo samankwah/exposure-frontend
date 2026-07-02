@@ -1,18 +1,17 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
-import dynamic from "next/dynamic";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Users, Wind } from "lucide-react";
-import { MapPanelSkeleton } from "@/components/Skeletons";
 import { useObservatoryFilters } from "@/components/ObservatoryContext";
+import { TargetNpweiMap } from "@/components/TargetNpweiMap";
 import type { Filters, Season } from "@/types/exposure";
-import { MONTHS, YEARS } from "@/data/sampleData";
 import { useBackendWebData } from "@/data/useWebData";
 import {
   SEASON_LABELS,
   getCityRows,
   getCountryRows,
   getHealthSeasonSummary,
+  getWebDataYears,
   type CityNpweiRow,
   type WebDataSeason
 } from "@/data/webData";
@@ -38,29 +37,22 @@ const COUNTRY_IDS: Record<string, string> = {
 
 type VisualLayerMode = "no2" | "population";
 type BarStyle = CSSProperties & Record<"--bar-width", string>;
-type DeferredTargetMapProps = {
-  layerMode?: VisualLayerMode;
-  month: number;
-  rows: CityNpweiRow[];
-  season: WebDataSeason;
-  year: number;
-};
 
-const DeferredTargetNpweiMap = dynamic<DeferredTargetMapProps>(
-  () => import("@/components/TargetNpweiMap").then((module) => module.TargetNpweiMap),
-  {
-    ssr: false,
-    loading: () => <MapPanelSkeleton />
-  }
-);
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 
 export function MapExplorer() {
   const { filters, setFilters } = useObservatoryFilters();
   const { version: dataVersion } = useBackendWebData();
-  const [season, setSeason] = useState<WebDataSeason>("Annual");
+  const [season, setSeason] = useState<WebDataSeason>("DJF");
   const [visualLayer, setVisualLayer] = useState<VisualLayerMode>("no2");
   const [selectedCityName, setSelectedCityName] = useState("all");
   const [month, setMonth] = useState<number>(filters.month === "all" ? 12 : filters.month);
+  const availableYears = useMemo(() => {
+    void dataVersion;
+    return getWebDataYears();
+  }, [dataVersion]);
+  const sliderMinYear = availableYears[0] ?? filters.year;
+  const sliderMaxYear = availableYears[availableYears.length - 1] ?? filters.year;
 
   const countryRows = useMemo(() => {
     void dataVersion;
@@ -80,29 +72,43 @@ export function MapExplorer() {
       .filter((row) => selectedCountryName === "all" || row.country === selectedCountryName)
       .filter((row) => selectedCityName === "all" || row.name === selectedCityName);
   }, [cityRows, selectedCityName, selectedCountryName]);
+  const hasActiveFilter = selectedCountryName !== "all" || selectedCityName !== "all";
+  const activeCityRows = hasActiveFilter ? visibleCityRows : cityRows;
   const cityOptions = useMemo(
     () => cityRows.filter((row) => selectedCountryName === "all" || row.country === selectedCountryName),
     [cityRows, selectedCountryName]
   );
+  const visibleCountryRows = useMemo(() => {
+    if (selectedCountryName !== "all") return countryRows.filter((row) => row.country === selectedCountryName);
+    if (selectedCityName === "all") return countryRows;
+
+    const cityCountries = new Set(activeCityRows.map((row) => row.country));
+    return countryRows.filter((row) => cityCountries.has(row.country));
+  }, [activeCityRows, countryRows, selectedCityName, selectedCountryName]);
   const topCountry =
     visualLayer === "population"
-      ? [...countryRows].sort((a, b) => b.urbanPopulationMillions - a.urbanPopulationMillions || b.npwei - a.npwei)[0]
-      : countryRows[0];
+      ? [...visibleCountryRows].sort((a, b) => b.urbanPopulationMillions - a.urbanPopulationMillions || b.npwei - a.npwei)[0]
+      : visibleCountryRows[0];
   const tableRows = useMemo(
-    () => getRankedCityRows(visibleCityRows.length > 0 ? visibleCityRows : cityRows, visualLayer),
-    [cityRows, visibleCityRows, visualLayer]
+    () => getRankedCityRows(activeCityRows, visualLayer),
+    [activeCityRows, visualLayer]
   );
-  const topCity = tableRows[0] ?? cityRows[0];
-  const weightedNpwei = getUrbanWeightedNpwei(countryRows);
-  const totalUrbanPopulation = countryRows.reduce((total, row) => total + row.urbanPopulationMillions, 0);
-  const years = getYearsLabel();
-  const mapTitle =
-    visualLayer === "population" ? "Urban Population Pixels \u2014 NASA GPW 2020" : "Population Weighted Exposure \u2014 Normalized (NPWEI)";
-  const legendTitle = visualLayer === "population" ? "Urban population (0-100 normalised)" : "NPWEI (0-100 normalised)";
-
+  const topCity = tableRows[0];
+  const weightedNpwei = getUrbanWeightedNpwei(visibleCountryRows);
+  const totalUrbanPopulation = visibleCountryRows.reduce((total, row) => total + row.urbanPopulationMillions, 0);
+  const years = getYearsLabel(availableYears);
   const patchFilters = (next: Partial<Filters>) => {
     setFilters((current) => ({ ...current, ...next }));
   };
+
+  useEffect(() => {
+    if (availableYears.length === 0) return;
+
+    setFilters((current) => {
+      if (availableYears.includes(current.year)) return current;
+      return { ...current, year: availableYears[availableYears.length - 1] };
+    });
+  }, [availableYears, setFilters]);
 
   const selectCountryName = (countryName: string) => {
     const countryId = countryName === "all" ? "all" : getCountryId(countryName);
@@ -163,8 +169,8 @@ export function MapExplorer() {
             Year <b>{filters.year}</b>
           </span>
           <input
-            max={YEARS[YEARS.length - 1]}
-            min={YEARS[0]}
+            max={sliderMaxYear}
+            min={sliderMinYear}
             step={1}
             type="range"
             value={filters.year}
@@ -204,7 +210,6 @@ export function MapExplorer() {
       <section className="target-map-layout" aria-label="Population weighted exposure map and city ranking">
         <article className="target-map-card">
           <header className="target-map-card-header">
-            <h2>{mapTitle}</h2>
             <div className="target-season-tabs" role="group" aria-label="Season view">
               {(["DJF", "Annual", "JJA"] as const).map((item) => (
                 <button className={season === item ? "active" : ""} key={item} type="button" onClick={() => selectSeason(item)}>
@@ -214,27 +219,16 @@ export function MapExplorer() {
             </div>
           </header>
           <div className="target-map-surface">
-            <DeferredTargetNpweiMap
+            <TargetNpweiMap
+              filterActive={hasActiveFilter}
               layerMode={visualLayer}
-              rows={visibleCityRows.length > 0 ? visibleCityRows : cityRows}
+              rows={activeCityRows}
               season={season}
               year={filters.year}
               month={month}
             />
-            <div className="target-pop-layer-note">{visualLayer === "population" ? "Population pixels" : "NO\u2082 weighted pixels"}</div>
-            <div className={visualLayer === "population" ? "target-map-legend population" : "target-map-legend"} aria-hidden>
-              <strong>{legendTitle}</strong>
-              <i />
-              <div>
-                <span>Low</span>
-                <span>0</span>
-                <span>20</span>
-                <span>40</span>
-                <span>60</span>
-                <span>80</span>
-                <span>100</span>
-                <span>High</span>
-              </div>
+            <div className="target-pop-layer-note">
+              {visualLayer === "population" ? "Population count" : "PWE = NO2 x Population"}
             </div>
           </div>
         </article>
@@ -275,7 +269,7 @@ function MapKpiStrip({
   return (
     <section className="target-map-kpi-strip" aria-label="Map summary">
       <article className="target-map-kpi">
-        <span>{isPopulation ? "West Africa Urban Pop" : "West Africa Avg NPWEI"}</span>
+        <span>{isPopulation ? "West Africa Urban Pop" : "West Africa Avg NPWEI Index"}</span>
         <strong className={isPopulation ? "blue" : "warn"}>{isPopulation ? formatPopulation(totalUrbanPopulation) : weightedNpwei}</strong>
         <small>{isPopulation ? "NASA GPW 2020" : weightedRisk}</small>
       </article>
@@ -297,7 +291,7 @@ function MapKpiStrip({
         <small className="blue">{healthSummary.high_risk_pct_urban.toFixed(1)}% of urban pop</small>
       </article>
       <article className="target-map-kpi">
-        <span>{isPopulation ? "Population Scale" : "NPWEI Range"}</span>
+        <span>{isPopulation ? "Population Scale" : "NPWEI Index Range"}</span>
         <strong>0-100</strong>
         <small>{SEASON_LABELS[season]}</small>
       </article>
@@ -323,7 +317,7 @@ function CityExposureTable({
   const maxUrbanPop = Math.max(1, ...rows.map((row) => row.urbanPop));
   const isPopulation = metricMode === "population";
   const title = isPopulation ? "Urban Population by City" : "NO\u2082 Exposure by City";
-  const valueHeader = isPopulation ? "POP (M)" : "NPWEI";
+  const valueHeader = isPopulation ? "POP (M)" : "NPWEI Index";
 
   return (
     <aside className="target-city-panel" aria-label={title}>
@@ -365,6 +359,13 @@ function CityExposureTable({
             </button>
           );
         })}
+        {rows.length === 0 ? (
+          <div className="target-city-row target-city-empty" role="row">
+            <span role="cell">No mapped cities</span>
+            <span role="cell">Selected filter</span>
+            <span role="cell">-</span>
+          </div>
+        ) : null}
       </div>
       <footer>NASA Gridded Population 2020 {"\u00b7"} {"\u2265"}50 ppl/km{"\u00b2"} urban pixels</footer>
     </aside>
@@ -428,6 +429,8 @@ function slugId(value: string) {
     .replace(/^-|-$/g, "");
 }
 
-function getYearsLabel() {
-  return `${YEARS[0]}-${YEARS[YEARS.length - 1]}`;
+function getYearsLabel(years: number[]) {
+  if (years.length === 0) return "No generated years";
+  if (years.length === 1) return String(years[0]);
+  return `${years[0]}-${years[years.length - 1]}`;
 }

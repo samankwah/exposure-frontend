@@ -10,15 +10,20 @@ import {
   UsersRound
 } from "lucide-react";
 import { BrandedNavbar } from "@/components/BrandedNavbar";
-import { getCityRows, getHealthSeasonSummary, getWebDataSummary } from "@/data/webData";
 import {
   DEFAULT_FILTERS,
   NO2_COLUMN_UNIT_LABEL,
-  getHotspots,
+  getCityRows,
+  getHealthSeasonSummary,
   getOverviewAnnualTrend,
+  getOverviewHotspots,
   getOverviewMonthlyCycle,
+  getWebDataObservationPeriod,
+  getWebDataSummary,
+  getWebDataYearRange,
+  getWebDataYears,
   toNo2ColumnValue
-} from "@/data/sampleData";
+} from "@/data/webData";
 import { createPageMetadata } from "@/app/metadata";
 import type { Hotspot, TrendPoint } from "@/types/exposure";
 
@@ -34,9 +39,9 @@ type InsightVisualKind = "monthly" | "annual" | "ranking";
 
 const webDataSummary = getWebDataSummary();
 const annualHealthSummary = getHealthSeasonSummary("Annual");
-const coveredYears = webDataSummary.years_covered;
-const yearRange =
-  coveredYears.length > 1 ? `${Math.min(...coveredYears)}-${Math.max(...coveredYears)}` : String(coveredYears[0] ?? "2020-2024");
+const coveredYears = Array.from(new Set([...webDataSummary.years_covered, ...getWebDataYears()])).sort((a, b) => a - b);
+const yearRange = coveredYears.length > 0 ? getWebDataYearRange() : "No generated years";
+const observationPeriod = getWebDataObservationPeriod();
 const urbanPopulationMillions = webDataSummary.total_urban_population / 1_000_000;
 
 const metrics = [
@@ -48,7 +53,7 @@ const metrics = [
 
 const monthlyCycle = getOverviewMonthlyCycle(DEFAULT_FILTERS);
 const annualTrend = getOverviewAnnualTrend(DEFAULT_FILTERS);
-const cityRanking = getHotspots(DEFAULT_FILTERS)
+const cityRanking = getOverviewHotspots(DEFAULT_FILTERS)
   .filter((hotspot) => Boolean(hotspot.cityId))
   .slice(0, 7);
 
@@ -87,7 +92,7 @@ const insightCards: {
 const methodologySteps = [
   {
     title: "Data Acquisition",
-    body: "Monthly TROPOMI NO2 L3 files (.nc4) downloaded from NASA GES DISC for Jan 2020-Dec 2024. NASA Gridded 2020 population raster clipped to West Africa at 0.1 degree resolution."
+    body: `Monthly TROPOMI NO2 L3 files (.nc4) downloaded from NASA GES DISC for ${observationPeriod}. NASA Gridded 2020 population raster clipped to West Africa at 0.1 degree resolution.`
   },
   {
     title: "Urban Masking",
@@ -290,25 +295,30 @@ function InsightVisual({ variant }: { variant: InsightVisualKind }) {
 }
 
 function MonthlyExposureChart({ data }: { data: TrendPoint[] }) {
-  const frame = { bottom: 258, height: 310, left: 56, right: 24, top: 36, width: 700 };
+  const frame = { bottom: 258, height: 310, left: 76, right: 112, top: 42, width: 700 };
   const no2Values = data.map((point) => point.no2 ?? 0);
   const fireValues = data.map((point) => point.fireCount ?? 0);
-  const no2Scale = getLinearScale(no2Values, frame.bottom, frame.top);
-  const fireScale = getLinearScale(fireValues, frame.bottom, frame.top + 34);
-  const xStep = (frame.width - frame.left - frame.right) / Math.max(1, data.length - 1);
-  const xFor = (index: number) => frame.left + index * xStep;
+  const no2Axis = getNiceTicks(no2Values, { tickCount: 5 });
+  const fireAxis = getNiceTicks(fireValues, { integer: true, tickCount: 5, zeroBased: true });
+  const no2Scale = getLinearScaleFromDomain(no2Axis.domain, frame.bottom, frame.top);
+  const fireScale = getLinearScaleFromDomain(fireAxis.domain, frame.bottom, frame.top);
+  const chartRight = frame.width - frame.right;
+  const plotInset = 18;
+  const xStep = (chartRight - frame.left - plotInset * 2) / Math.max(1, data.length - 1);
+  const xFor = (index: number) => frame.left + plotInset + index * xStep;
   const no2Line = data.map((point, index) => `${index === 0 ? "M" : "L"}${xFor(index).toFixed(1)} ${no2Scale(point.no2 ?? 0).toFixed(1)}`).join(" ");
   const no2Area = `${no2Line} L${xFor(data.length - 1).toFixed(1)} ${frame.bottom} L${frame.left} ${frame.bottom} Z`;
   const barWidth = Math.min(28, xStep * 0.46);
 
   return (
     <svg viewBox={`0 0 ${frame.width} ${frame.height}`} role="img" aria-label="Monthly NO₂ and fire activity chart">
-      <ChartBackground frame={frame} ticks={4} />
+      <ChartBackground frame={frame} showYAxis={false} tickValues={no2Axis.ticks} yScale={no2Scale} />
       <text className="chart-title" x={frame.left} y={20}>
         Monthly NO₂ column and fire detections
       </text>
       {data.map((point, index) => {
-        const barHeight = frame.bottom - fireScale(point.fireCount ?? 0);
+        const barY = fireScale(point.fireCount ?? 0);
+        const barHeight = frame.bottom - barY;
         return (
           <rect
             className="chart-bar-fire"
@@ -317,7 +327,7 @@ function MonthlyExposureChart({ data }: { data: TrendPoint[] }) {
             rx="5"
             width={barWidth}
             x={xFor(index) - barWidth / 2}
-            y={fireScale(point.fireCount ?? 0)}
+            y={barY}
           />
         );
       })}
@@ -326,7 +336,23 @@ function MonthlyExposureChart({ data }: { data: TrendPoint[] }) {
       {data.map((point, index) => (
         <circle className="chart-dot-no2" cx={xFor(index)} cy={no2Scale(point.no2 ?? 0)} key={`${point.label}-dot`} r="4" />
       ))}
-      <ChartYAxisLabels frame={frame} values={no2Values} suffix="" />
+      <ChartYAxisLabels
+        formatValue={(value) => formatTickValue(value, no2Axis.step)}
+        frame={frame}
+        scale={no2Scale}
+        ticks={no2Axis.ticks}
+        title="NO₂ column"
+        values={no2Values}
+      />
+      <ChartYAxisLabels
+        formatValue={(value) => Math.round(value).toLocaleString()}
+        frame={frame}
+        scale={fireScale}
+        side="right"
+        ticks={fireAxis.ticks}
+        title="Fire detections"
+        values={fireValues}
+      />
       <g className="chart-axis">
         {data.map((point, index) =>
           index % 3 === 0 ? (
@@ -341,7 +367,7 @@ function MonthlyExposureChart({ data }: { data: TrendPoint[] }) {
           ["NO₂ column", "no2"],
           ["Fire detections", "fire"]
         ]}
-        x={frame.width - 230}
+        x={frame.width - 272}
         y={18}
       />
     </svg>
@@ -366,7 +392,7 @@ function AnnualTrendChart({ data }: { data: TrendPoint[] }) {
     <svg viewBox={`0 0 ${frame.width} ${frame.height}`} role="img" aria-label="Annual NO₂ and population exposure trend chart">
       <ChartBackground frame={frame} ticks={3} />
       <text className="chart-title" x={frame.left} y={24}>
-        2020-2024 exposure trend
+        {yearRange} exposure trend
       </text>
       <path className="chart-area-exposure" d={exposureArea} />
       <path className="chart-line-exposure" d={exposureLine} />
@@ -435,42 +461,97 @@ function CityRankingChart({ data }: { data: Hotspot[] }) {
 
 function ChartBackground({
   frame,
-  ticks
+  showYAxis = true,
+  tickValues,
+  ticks,
+  yScale
 }: {
   frame: { bottom: number; height: number; left: number; right: number; top: number; width: number };
-  ticks: number;
+  showYAxis?: boolean;
+  ticks?: number;
+  tickValues?: number[];
+  yScale?: (value: number) => number;
 }) {
-  const gridLines = Array.from({ length: ticks }, (_, index) => frame.top + ((frame.bottom - frame.top) * index) / Math.max(1, ticks - 1));
+  const gridLines =
+    tickValues && yScale
+      ? tickValues.map((value) => yScale(value))
+      : Array.from({ length: ticks ?? 4 }, (_, index) => frame.top + ((frame.bottom - frame.top) * index) / Math.max(1, (ticks ?? 4) - 1));
+  const axisPath = showYAxis ? `M${frame.left} ${frame.top}V${frame.bottom}H${frame.width - frame.right}` : `M${frame.left} ${frame.bottom}H${frame.width - frame.right}`;
 
   return (
     <>
       <path className="chart-grid-fill" d={`M0 0h${frame.width}v${frame.height}H0z`} />
       <path className="chart-grid-line" d={gridLines.map((y) => `M${frame.left} ${y.toFixed(1)}H${frame.width - frame.right}`).join(" ")} />
-      <path className="chart-axis-line" d={`M${frame.left} ${frame.top}V${frame.bottom}H${frame.width - frame.right}`} />
+      <path className="chart-axis-line" d={axisPath} />
     </>
   );
 }
 
 function ChartYAxisLabels({
   frame,
-  suffix,
+  formatValue,
+  scale,
+  showAxis,
+  side = "left",
+  suffix = "",
+  textAnchor,
+  ticks,
+  title,
   values
 }: {
-  frame: { bottom: number; left: number; top: number };
-  suffix: string;
+  formatValue?: (value: number) => string;
+  frame: { bottom: number; left: number; right?: number; top: number; width?: number };
+  scale?: (value: number) => number;
+  showAxis?: boolean;
+  side?: "left" | "right";
+  suffix?: string;
+  textAnchor?: "start" | "middle" | "end";
+  ticks?: number[];
+  title?: string;
   values: number[];
 }) {
   const { max, min } = getExtent(values);
-  const ticks = [max, min + (max - min) / 2, min];
+  const axisTicks = ticks ?? [max, min + (max - min) / 2, min];
+  const valueScale = scale ?? getLinearScaleFromDomain([min, max], frame.bottom, frame.top);
+  const chartRight = typeof frame.width === "number" && typeof frame.right === "number" ? frame.width - frame.right : frame.left;
+  const axisX = side === "right" ? chartRight : frame.left;
+  const tickSize = 6;
+  const tickPadding = 8;
+  const labelX = side === "right" ? axisX + tickSize + tickPadding : axisX - tickSize - tickPadding;
+  const axisTitleX = side === "right" ? (typeof frame.width === "number" ? frame.width - 22 : chartRight + 58) : Math.max(14, frame.left - 58);
+  const axisTitleY = frame.top + (frame.bottom - frame.top) / 2;
+  const resolvedTextAnchor = textAnchor ?? (side === "right" ? "start" : "end");
+  const titleRotation = side === "right" ? 90 : -90;
+  const renderAxis = showAxis ?? Boolean(title);
 
   return (
     <g className="chart-axis">
-      {ticks.map((value, index) => (
-        <text key={value} textAnchor="end" x={frame.left - 10} y={frame.top + ((frame.bottom - frame.top) * index) / 2 + 4}>
-          {value.toFixed(1)}
-          {suffix}
+      {renderAxis ? <path className="chart-axis-spine" d={`M${axisX} ${frame.top}V${frame.bottom}`} /> : null}
+      {title ? (
+        <text
+          className="chart-axis-title"
+          textAnchor="middle"
+          transform={`rotate(${titleRotation} ${axisTitleX} ${axisTitleY})`}
+          x={axisTitleX}
+          y={axisTitleY}
+        >
+          {title}
         </text>
-      ))}
+      ) : null}
+      {axisTicks.map((value, index) => {
+        const y = valueScale(value);
+        const tickX2 = side === "right" ? axisX + tickSize : axisX - tickSize;
+
+        return (
+          <g key={`${side}-${value}-${index}`}>
+            {renderAxis ? <path className="chart-axis-tick" d={`M${axisX} ${y.toFixed(1)}H${tickX2}`} /> : null}
+            <text dominantBaseline="middle" textAnchor={resolvedTextAnchor} x={labelX} y={y}>
+              {formatValue ? formatValue(value) : value.toFixed(1)}
+              {suffix}
+            </text>
+          </g>
+        );
+      })}
     </g>
   );
 }
@@ -490,6 +571,80 @@ function ChartLegend({ items, x, y }: { items: [string, "no2" | "fire" | "exposu
   );
 }
 
+function getNiceTicks(
+  values: number[],
+  options: { integer?: boolean; tickCount?: number; zeroBased?: boolean } = {}
+): { domain: [number, number]; step: number; ticks: number[] } {
+  const finiteValues = values.filter((value) => Number.isFinite(value));
+  const tickCount = Math.max(2, options.tickCount ?? 5);
+  const fallbackMin = finiteValues.length > 0 ? Math.min(...finiteValues) : 0;
+  const fallbackMax = finiteValues.length > 0 ? Math.max(...finiteValues) : 1;
+  const dataMin = options.zeroBased ? 0 : fallbackMin;
+  const dataMax = Math.max(fallbackMax, options.zeroBased ? 1 : dataMin + 0.1);
+  const minValue = options.zeroBased ? 0 : dataMin;
+  const maxValue = dataMax > minValue ? dataMax : minValue + (options.integer ? 1 : 0.1);
+  const rawStep = (maxValue - minValue) / Math.max(1, tickCount - 1);
+  const candidates = getNiceStepCandidates(rawStep, Boolean(options.integer));
+  const positiveOnly = finiteValues.every((value) => value >= 0);
+
+  const best = candidates
+    .map((step) => {
+      let min = options.zeroBased ? 0 : roundTick(Math.floor(minValue / step) * step);
+      if (!options.zeroBased && positiveOnly) min = Math.max(0, min);
+
+      const neededSteps = Math.ceil((maxValue - min) / step);
+      const axisSteps = options.zeroBased ? Math.max(tickCount - 1, neededSteps) : neededSteps;
+      const max = roundTick(min + axisSteps * step);
+      const count = axisSteps + 1;
+      const countPenalty = count >= 4 && count <= 5 ? 0 : Math.abs(count - tickCount) + 4;
+      const padding = Math.max(0, max - maxValue) + Math.max(0, minValue - min);
+
+      return { count, max, min, padding, score: countPenalty * 100 + Math.abs(count - tickCount) * 8 + padding / step, step };
+    })
+    .sort((a, b) => a.score - b.score || a.padding - b.padding)[0];
+
+  const ticks = Array.from({ length: best.count }, (_, index) => roundTick(best.min + index * best.step));
+  return { domain: [best.min, best.max], step: best.step, ticks };
+}
+
+function getNiceStepCandidates(rawStep: number, integer: boolean) {
+  const safeStep = Math.max(rawStep, Number.EPSILON);
+  const exponent = Math.floor(Math.log10(safeStep));
+  const multipliers = [1, 2, 2.5, 5, 10];
+  const candidates = new Set<number>();
+
+  for (let power = exponent - 2; power <= exponent + 2; power += 1) {
+    const magnitude = 10 ** power;
+    for (const multiplier of multipliers) {
+      const step = roundTick(multiplier * magnitude);
+      if (integer && (!Number.isInteger(step) || step < 1)) continue;
+      candidates.add(step);
+    }
+  }
+
+  if (candidates.size === 0) candidates.add(1);
+  return Array.from(candidates).sort((a, b) => a - b);
+}
+
+function roundTick(value: number) {
+  return Number(value.toPrecision(12));
+}
+
+function formatTickValue(value: number, step: number) {
+  const precision = getStepPrecision(step);
+  return value.toLocaleString(undefined, {
+    maximumFractionDigits: precision,
+    minimumFractionDigits: precision
+  });
+}
+
+function getStepPrecision(step: number) {
+  for (let precision = 0; precision <= 4; precision += 1) {
+    if (Number.isInteger(roundTick(step * 10 ** precision))) return precision;
+  }
+  return 1;
+}
+
 function getExtent(values: number[]) {
   const minValue = Math.min(...values);
   const maxValue = Math.max(...values);
@@ -500,8 +655,12 @@ function getExtent(values: number[]) {
   };
 }
 
+function getLinearScaleFromDomain([min, max]: [number, number], bottom: number, top: number) {
+  const height = bottom - top;
+  return (value: number) => bottom - ((value - min) / Math.max(Number.EPSILON, max - min)) * height;
+}
+
 function getLinearScale(values: number[], bottom: number, top: number) {
   const { max, min } = getExtent(values);
-  const height = bottom - top;
-  return (value: number) => bottom - ((value - min) / Math.max(1, max - min)) * height;
+  return getLinearScaleFromDomain([min, max], bottom, top);
 }

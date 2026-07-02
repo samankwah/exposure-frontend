@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { CloudSun, Database, ExternalLink, Mail, Map, ShieldCheck } from "lucide-react";
+import { getCityRows, getWebDataYearRange } from "@/data/webData";
+import { useBackendWebData } from "@/data/useWebData";
 
 const platformLinks = [
   { href: "/", label: "Home" },
@@ -19,6 +21,10 @@ const explorerLinks = [
 
 export function ObservatoryFooter({ variant = "app" }: { variant?: "app" | "site" }) {
   const currentYear = new Date().getFullYear();
+  const { version: dataVersion } = useBackendWebData();
+  void dataVersion;
+  const yearRange = getWebDataYearRange();
+  const cityCount = getCityRows("Annual").length;
 
   return (
     <footer className={`observatory-footer observatory-footer-${variant}`}>
@@ -39,8 +45,8 @@ export function ObservatoryFooter({ variant = "app" }: { variant?: "app" | "site
           </p>
           <div className="footer-badges" aria-label="Platform status and coverage">
             <span>Beta 1.0</span>
-            <span>2020-2024</span>
-            <span>27 cities</span>
+            <span>{yearRange}</span>
+            <span>{cityCount} cities</span>
           </div>
         </section>
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import africaContourMap from "../src/data/africaContourMap.json";
+import westAfricaBoundary from "../src/data/westAfricaBoundary.json";
 
 describe("map boundary data", () => {
   it("loads the Africa contour converted from the shapefile", () => {
@@ -15,6 +16,26 @@ describe("map boundary data", () => {
     expect(bounds.south).toBeLessThanOrEqual(-34);
     expect(bounds.east).toBeGreaterThanOrEqual(63);
     expect(bounds.north).toBeGreaterThanOrEqual(37);
+  });
+
+  it("loads the West Africa country boundary generated from Natural Earth", () => {
+    const iso3Codes = westAfricaBoundary.features.map((feature) => feature.properties.iso3);
+
+    expect(westAfricaBoundary.type).toBe("FeatureCollection");
+    expect(westAfricaBoundary.features).toHaveLength(15);
+    expect(iso3Codes).toContain("SEN");
+    expect(iso3Codes).toContain("NGA");
+    expect(iso3Codes).not.toContain("CMR");
+    expect(westAfricaBoundary.features.every((feature) => feature.properties.source.includes("Natural Earth"))).toBe(true);
+  });
+
+  it("keeps the West Africa country boundary inside the app data region", () => {
+    const bounds = getBounds(westAfricaBoundary.features.map((feature) => feature.geometry.coordinates));
+
+    expect(bounds.west).toBeLessThanOrEqual(-17);
+    expect(bounds.south).toBeLessThanOrEqual(4.5);
+    expect(bounds.east).toBeLessThan(17);
+    expect(bounds.north).toBeGreaterThanOrEqual(27);
   });
 });
 

@@ -32,6 +32,7 @@ import {
   getHighRiskCityCount,
   getHighRiskCountryCount,
   getRiskTier,
+  getWebDataYearRange,
   type CityNpweiRow,
   type HealthRiskTierRow,
   type RiskTierLabel,
@@ -46,6 +47,10 @@ export function HealthPage() {
   const { version: dataVersion } = useBackendWebData();
   const [season, setSeason] = useState<WebDataSeason>("Annual");
   const [cityFocus, setCityFocus] = useState(ALL_CITIES);
+  const yearRange = useMemo(() => {
+    void dataVersion;
+    return getWebDataYearRange();
+  }, [dataVersion]);
 
   const summary = getHealthSeasonSummary(season);
   const cityRows = useMemo(() => {
@@ -83,6 +88,7 @@ export function HealthPage() {
         <div className="data-page-inner health-dashboard-inner">
           <HealthHeader
             season={season}
+            yearRange={yearRange}
             onExportCsv={exportCsv}
             onPrint={() => window.print()}
           />
@@ -171,11 +177,13 @@ export function HealthPage() {
 function HealthHeader({
   onExportCsv,
   onPrint,
-  season
+  season,
+  yearRange
 }: {
   onExportCsv: () => void;
   onPrint: () => void;
   season: WebDataSeason;
+  yearRange: string;
 }) {
   return (
     <header className="health-hero">
@@ -186,7 +194,7 @@ function HealthHeader({
         </span>
         <h1 id="health-title">Population Exposure &amp; Health Risk</h1>
         <p>
-          Urban NO{"\u2082"} health burden across West African cities · NPWEI tiers · 2020–2024 · {SEASON_LABELS[season]}
+          Urban NO{"\u2082"} health burden across West African cities - NPWEI tiers - {yearRange} - {SEASON_LABELS[season]}
         </p>
       </div>
 
@@ -466,6 +474,8 @@ function CityExposureGrid({
 }
 
 function HealthInsightGrid({ season }: { season: WebDataSeason }) {
+  const yearRange = getWebDataYearRange();
+
   return (
     <section className="health-panel health-insight-section" aria-labelledby="health-insights-title">
       <header className="health-panel-header">
@@ -474,7 +484,7 @@ function HealthInsightGrid({ season }: { season: WebDataSeason }) {
       </header>
 
       <div className="health-insight-grid">
-        {getHealthInterpretations(season).map((card) => {
+        {getHealthInterpretations(season, yearRange).map((card) => {
           const Icon = card.icon;
           return (
             <article className={`health-insight-card health-insight-card-${card.tone}`} key={card.title}>
@@ -533,7 +543,8 @@ function getCityRiskTierRows(rows: CityNpweiRow[]): HealthRiskTierRow[] {
 }
 
 function getHealthInterpretations(
-  season: WebDataSeason
+  season: WebDataSeason,
+  yearRange: string
 ): Array<{ body: string; icon: LucideIcon; title: string; tone: "amber" | "blue" | "green" | "pink" | "purple" }> {
   const topCountry = getHealthHighRiskCountries(season)[0];
   const topCity = getHealthHighRiskCities(season)[0];
@@ -579,7 +590,7 @@ function getHealthInterpretations(
       tone: "pink"
     },
     {
-      body: "All estimates use Sentinel-5P TROPOMI NO\u2082 columns (2020-2024), population-weighted via NASA Gridded Population 2020 at >=50 ppl/km2.",
+      body: `All estimates use Sentinel-5P TROPOMI NO\u2082 columns (${yearRange}), population-weighted via NASA Gridded Population 2020 at >=50 ppl/km2.`,
       icon: Database,
       title: "Data Basis",
       tone: "purple"

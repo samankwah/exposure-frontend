@@ -14,9 +14,9 @@ import type {
   SummaryMetric,
   TrendPoint
 } from "@/types/exposure";
-import abnMapBoundary from "./abnMapBoundary.json";
+import westAfricaBoundary from "./westAfricaBoundary.json";
 
-export const YEARS = [2020, 2021, 2022, 2023, 2024];
+export const YEARS = [2020, 2021, 2022, 2023, 2024, 2025];
 export const NO2_COLUMN_UNIT = "x10^15 molecules cm^-2";
 export const NO2_COLUMN_UNIT_LABEL = "×10¹⁵ molecules cm⁻²";
 
@@ -46,9 +46,9 @@ export const DEFAULT_FILTERS: Filters = {
   regionId: "west-africa",
   countryId: "all",
   cityId: "all",
-  year: 2024,
+  year: 2025,
   startYear: 2020,
-  endYear: 2024,
+  endYear: 2025,
   month: "all",
   season: "all"
 };
@@ -358,7 +358,8 @@ const OVERVIEW_TREND: Record<number, number> = {
   2021: 2.21,
   2022: 2.32,
   2023: 2.39,
-  2024: 2.45
+  2024: 2.45,
+  2025: 2.51
 };
 
 const MEAN_COLUMN_SCALE = 2.45 / 17.7;
@@ -366,51 +367,12 @@ const COUNTRY_COLUMN_SCALE = 4.72 / 28.6;
 const HOTSPOT_COLUMN_SCALE = 8.61 / 42.7;
 export const INTERPOLATION_RESOLUTION_KM = 27;
 export const INTERPOLATION_CELL_DEGREES = INTERPOLATION_RESOLUTION_KM / 111.32;
-export const WEST_AFRICA_INTERPOLATION_BOUNDS = [-18.2, 1.6, 24.2, 25.3] as const;
-
-const WEST_AFRICA_LAND_MASK: [number, number][] = [
-  [-18.2, 16.9],
-  [-16.8, 20.4],
-  [-12.2, 25.3],
-  [4.6, 25.3],
-  [16.8, 23.9],
-  [16.8, 10.4],
-  [14.9, 10.4],
-  [14.8, 4.0],
-  [12.4, 4.2],
-  [10.4, 3.9],
-  [8.8, 4.3],
-  [7.2, 4.7],
-  [5.8, 5.3],
-  [4.6, 6.0],
-  [3.3, 6.4],
-  [2.2, 6.3],
-  [1.1, 6.1],
-  [0.2, 5.8],
-  [-0.7, 5.4],
-  [-1.8, 5.1],
-  [-3.2, 5.0],
-  [-4.5, 5.1],
-  [-5.8, 5.0],
-  [-7.3, 4.6],
-  [-8.4, 4.8],
-  [-9.7, 5.6],
-  [-10.8, 6.3],
-  [-11.8, 7.1],
-  [-13.0, 8.4],
-  [-13.8, 9.6],
-  [-14.4, 10.9],
-  [-15.4, 12.1],
-  [-16.7, 13.4],
-  [-17.6, 14.9],
-  [-18.2, 16.9]
-];
+export const WEST_AFRICA_INTERPOLATION_BOUNDS = [-17.8, 4.0, 16.2, 27.4] as const;
 
 const REGIONAL_NO2_ANCHORS = [
   { label: "Mauritania", coordinates: [-10.2, 20.4], value: 1.11, weight: 0.95 },
   { label: "Mali", coordinates: [-3.8, 17.4], value: 1.82, weight: 1.1 },
   { label: "Niger", coordinates: [8.2, 17.5], value: 1.52, weight: 1.1 },
-  { label: "Chad", coordinates: [15.0, 15.7], value: 0.71, weight: 0.95 },
   { label: "Senegal", coordinates: [-14.4, 14.5], value: 2.53, weight: 1.15 },
   { label: "The Gambia", coordinates: [-15.5, 13.5], value: 0.98, weight: 0.9 },
   { label: "Guinea-Bissau", coordinates: [-15.0, 12.0], value: 1.05, weight: 0.9 },
@@ -423,14 +385,12 @@ const REGIONAL_NO2_ANCHORS = [
   { label: "Benin", coordinates: [2.4, 9.4], value: 2.17, weight: 1.05 },
   { label: "Burkina Faso", coordinates: [-1.6, 12.2], value: 1.71, weight: 1.1 },
   { label: "Nigeria", coordinates: [8.1, 9.4], value: 4.72, weight: 1.35 },
-  { label: "Cameroon", coordinates: [12.7, 6.7], value: 2.28, weight: 1.05 },
   { label: "Dakar plume", coordinates: [-17.4, 14.7], value: 6.7, weight: 3.2 },
   { label: "Bamako corridor", coordinates: [-8.0, 12.6], value: 3.3, weight: 2.1 },
   { label: "Abidjan plume", coordinates: [-4.0, 5.4], value: 5.8, weight: 2.9 },
   { label: "Accra coastal plume", coordinates: [-0.2, 5.6], value: 5.2, weight: 2.6 },
   { label: "Lagos urban plume", coordinates: [3.4, 6.5], value: 8.61, weight: 5.2 },
-  { label: "Kano urban plume", coordinates: [8.5, 12.0], value: 7.6, weight: 4.3 },
-  { label: "Lake Chad plume", coordinates: [14.2, 12.7], value: 5.4, weight: 2.8 }
+  { label: "Kano urban plume", coordinates: [8.5, 12.0], value: 7.6, weight: 4.3 }
 ] satisfies Array<{ label: string; coordinates: [number, number]; value: number; weight: number }>;
 
 const REGIONAL_FIRE_CLUSTERS = [
@@ -438,9 +398,7 @@ const REGIONAL_FIRE_CLUSTERS = [
   { label: "Guinea savanna", center: [-9.2, 9.3], spread: [4.8, 1.5], count: 95, boost: 12 },
   { label: "Cote d'Ivoire-Ghana transition", center: [-3.0, 7.8], spread: [4.2, 1.4], count: 88, boost: 10 },
   { label: "Burkina Faso grassland", center: [-1.1, 12.0], spread: [4.6, 1.8], count: 96, boost: 28 },
-  { label: "Nigeria savanna", center: [7.4, 9.4], spread: [5.0, 1.9], count: 130, boost: 34 },
-  { label: "Cameroon corridor", center: [12.7, 7.3], spread: [2.8, 1.2], count: 58, boost: 20 },
-  { label: "Chad basin", center: [14.8, 12.5], spread: [2.6, 1.2], count: 46, boost: 24 }
+  { label: "Nigeria savanna", center: [7.4, 9.4], spread: [5.0, 1.9], count: 130, boost: 34 }
 ] as const;
 
 const REGIONAL_FIRE_ACTIVITY_POINTS: FireActivityPoint[] = REGIONAL_FIRE_CLUSTERS.flatMap((cluster, clusterIndex) => {
@@ -472,7 +430,11 @@ function regionCountryIds(regionId?: string) {
 }
 
 function isDefaultWestAfrica(filters: Filters) {
-  return (filters.regionId ?? "west-africa") === "west-africa" && filters.countryId === "all" && filters.year === 2024;
+  return (
+    (filters.regionId ?? "west-africa") === "west-africa" &&
+    filters.countryId === "all" &&
+    filters.year === YEARS[YEARS.length - 1]
+  );
 }
 
 export function getCountriesForRegion(regionId?: string) {
@@ -651,10 +613,10 @@ function pointInBounds(point: [number, number], bounds: readonly [number, number
 
 function isInsideInterpolationMask(point: [number, number], filters: Filters, countries: Country[]) {
   if (filters.countryId === "all" && (filters.regionId ?? "west-africa") === "west-africa") {
-    return pointInPolygon(point, WEST_AFRICA_LAND_MASK) || pointInGeoJsonFeatureCollection(point, abnMapBoundary as any);
+    return pointInGeoJsonFeatureCollection(point, westAfricaBoundary as any);
   }
 
-  if (!pointInPolygon(point, WEST_AFRICA_LAND_MASK) && !pointInGeoJsonFeatureCollection(point, abnMapBoundary as any)) return false;
+  if (!pointInGeoJsonFeatureCollection(point, westAfricaBoundary as any)) return false;
 
   return countries.some((country) => pointInPolygon(point, country.polygon));
 }
@@ -795,10 +757,10 @@ export function getOverviewMetrics(filters: Filters): SummaryMetric[] {
     (point) => point.year === Math.max(YEARS[0], filters.year - 1)
   );
   const westAfricaAverage = isDefaultWestAfrica(filters)
-    ? 2.45
+    ? 2.51
     : toNo2ColumnValue(Number(annual?.no2 ?? 0), "mean");
   const previousAverage = isDefaultWestAfrica(filters)
-    ? 2.39
+    ? 2.45
     : toNo2ColumnValue(Number(previous?.no2 ?? annual?.no2 ?? 0), "mean");
   const highestCountryValue = isDefaultWestAfrica(filters) && topCountry?.id === "nga" ? 4.72 : topCountry?.no2 ?? 0;
   const highestHotspotValue =

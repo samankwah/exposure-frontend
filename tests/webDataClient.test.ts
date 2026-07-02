@@ -1,5 +1,20 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { fetchBackendWebDataSnapshot, loadWebDataSnapshot } from "../src/data/webDataClient";
+import {
+  buildNo2GridDataUrl,
+  buildNo2TileUrlTemplate,
+  fetchBackendWebDataSnapshot,
+  fetchNo2MapGridData,
+  fetchNo2MapGridMetadata,
+  fetchNo2MapTileMetadata,
+  getNo2MapSeasonYearRanges,
+  loadNo2MapData,
+  loadWebDataSnapshot,
+  normalizeNo2MapGridMetadata,
+  normalizeNo2MapTileMetadata,
+  type No2MapGridMetadata
+} from "../src/data/webDataClient";
 import {
   getCityRows,
   getCountryRows,
@@ -97,6 +112,31 @@ describe("backend web_data client", () => {
     expect(getHealthSeasonSummary("Annual").high_risk_population_millions).toBeGreaterThan(0);
   });
 
+  it("keeps local fallback JSON aligned to the required generated schema", () => {
+    const snapshot = getLocalWebDataSnapshot();
+    const city = Object.values(snapshot.citiesPwe)[0];
+    const country = Object.values(snapshot.countryPwe)[0];
+
+    expect(city).toEqual(expect.objectContaining({
+      Annual_pwe: expect.any(Number),
+      DJF_pwe: expect.any(Number),
+      JJA_pwe: expect.any(Number),
+      country: expect.any(String),
+      urban_pop: expect.any(Number)
+    }));
+    expect(country).toEqual(expect.objectContaining({
+      Annual: expect.any(Number),
+      DJF: expect.any(Number),
+      JJA: expect.any(Number),
+      urban_population_millions: expect.any(Number)
+    }));
+    expect(snapshot.summary).toEqual(expect.objectContaining({
+      formula: expect.any(String),
+      no2_units: expect.any(String),
+      years_covered: expect.any(Array)
+    }));
+  });
+
   it("uses canonical risk labels while accepting legacy aliases", () => {
     const snapshot = cloneLocalSnapshot();
     snapshot.cityRows = {
@@ -116,16 +156,359 @@ describe("backend web_data client", () => {
   it("formats PWE in source units", () => {
     expect(formatPwe(3_354_604_383_762_359)).toBe("3.35 x 10^15 molec cm^-2");
   });
+
+  it("parses NO2 map metadata and builds the vector tile URL template", async () => {
+    const metadata = await fetchNo2MapTileMetadata(async () => responseFrom(sampleMapMetadata()), "http://backend.test");
+
+    expect(metadata.valueField).toBe("log10_pixel_exposure");
+    expect(metadata.log10PixelExposure).toEqual({ min: 18.2, max: 20.4 });
+    expect(getNo2MapSeasonYearRanges(metadata, "DJF", 2024)?.log10PixelExposure).toEqual({ min: 19.1, max: 20.1 });
+    expect(getNo2MapSeasonYearRanges(metadata, "JJA", 2024)?.log10PixelExposure).toEqual({ min: 18.5, max: 19.4 });
+    expect(buildNo2TileUrlTemplate(metadata, "Annual", 2024, "http://backend.test")).toBe(
+      "http://backend.test/api/map/no2/tiles/Annual/2024/{z}/{x}/{y}.mvt"
+    );
+    expect(buildNo2TileUrlTemplate(metadata, "DJF", 2024, "http://backend.test")).toBe(
+      "http://backend.test/api/map/no2/tiles/DJF/2024/{z}/{x}/{y}.mvt"
+    );
+  });
+
+  it("normalizes null NO2 map season-year definition as omitted", () => {
+    const metadata = normalizeNo2MapTileMetadata({ ...sampleMapMetadata(), seasonYearDefinition: null });
+
+    expect(metadata.seasonYearDefinition).toBeUndefined();
+  });
+
+  it("rejects map metadata that is not keyed to log10 pixel exposure", () => {
+    const metadata = { ...sampleMapMetadata(), valueField: "npwei" };
+
+    expect(() => normalizeNo2MapTileMetadata(metadata)).toThrow("log10_pixel_exposure");
+  });
+
+  it("parses NO2 grid metadata and builds the grid data URL", async () => {
+    const metadata = await fetchNo2MapGridMetadata(async () => responseFrom(sampleGridMetadata()), "http://backend.test");
+
+    expect(metadata.valueField).toBe("log10_pixel_exposure");
+    expect(metadata.log10PixelExposure).toEqual({ min: 18.2, max: 20.4 });
+    expect(buildNo2GridDataUrl(metadata, "DJF", 2024, "http://backend.test")).toBe(
+      "http://backend.test/api/map/no2/grid/DJF/2024.json"
+    );
+  });
+
+  it("normalizes null NO2 grid season-year definition as omitted", () => {
+    const metadata = normalizeNo2MapGridMetadata({ ...sampleGridMetadata(), seasonYearDefinition: null });
+
+    expect(metadata.seasonYearDefinition).toBeUndefined();
+  });
+
+  it("rejects grid metadata that is not keyed to log10 pixel exposure", () => {
+    const metadata = { ...sampleGridMetadata(), valueField: "npwei" };
+
+    expect(() => normalizeNo2MapGridMetadata(metadata)).toThrow("log10_pixel_exposure");
+  });
+
+  it("parses NO2 grid GeoJSON feature collections", async () => {
+    const body = {
+      type: "FeatureCollection",
+      features: [{ type: "Feature", properties: { log10_pixel_exposure: 19 }, geometry: null }]
+    };
+
+    const data = await fetchNo2MapGridData(async () => responseFrom(body), sampleGridMetadata(), "Annual", 2024, "http://backend.test");
+
+    expect(data.features).toHaveLength(1);
+    expect(data.features[0].properties?.log10_pixel_exposure).toBe(19);
+  });
+
+  it("uses the tile source when NO2 tile metadata supports the requested season and year", async () => {
+    const requests: string[] = [];
+    const fetcher: typeof fetch = async (url) => {
+      const requestUrl = String(url);
+      requests.push(requestUrl);
+      if (requestUrl.endsWith("/api/map/no2/metadata")) return responseFrom(sampleMapMetadata());
+      if (requestUrl.includes("/api/map/no2/tiles/Annual/2024/4/")) return responseFrom(null);
+      throw new Error(`Unexpected request ${requestUrl}`);
+    };
+
+    const result = await loadNo2MapData(fetcher, "http://backend.test", "Annual", 2024, { retryDelayMs: 0 });
+
+    expect(result.source).toBe("tile");
+    expect(result.metadata.layerName).toBe("no2_pixels");
+    expect(requests[0]).toBe("http://backend.test/api/map/no2/metadata");
+    expect(requests.slice(1).length).toBeGreaterThan(0);
+    expect(requests.slice(1).every((request) => request.includes("/api/map/no2/tiles/Annual/2024/4/"))).toBe(true);
+    expect(requests.some((request) => request.includes("/api/map/no2/ti/"))).toBe(false);
+  });
+
+  it("falls back to grid source when NO2 tile metadata is unavailable", async () => {
+    const requests: string[] = [];
+    const fetcher: typeof fetch = async (url) => {
+      const requestUrl = String(url);
+      requests.push(requestUrl);
+      if (requestUrl.endsWith("/api/map/no2/metadata")) return responseFrom(null, { status: 204 });
+      if (requestUrl.endsWith("/api/map/no2/grid/metadata")) return responseFrom(sampleGridMetadata());
+      if (requestUrl.endsWith("/api/map/no2/grid/DJF/2024.json")) return responseFrom(sampleGridFeatureCollection());
+      throw new Error(`Unexpected request ${requestUrl}`);
+    };
+
+    const result = await loadNo2MapData(fetcher, "http://backend.test", "DJF", 2024, { retryDelayMs: 0 });
+
+    if (result.source !== "grid") throw new Error(`Expected grid source, received ${result.source}`);
+    expect(result.data.features).toHaveLength(1);
+    expect(requests).toEqual([
+      "http://backend.test/api/map/no2/metadata",
+      "http://backend.test/api/map/no2/grid/metadata",
+      "http://backend.test/api/map/no2/grid/DJF/2024.json"
+    ]);
+  });
+
+  it("retries transient metadata fetch failures and succeeds without a page refresh", async () => {
+    let metadataAttempts = 0;
+    const fetcher: typeof fetch = async (url) => {
+      const requestUrl = String(url);
+      if (requestUrl.endsWith("/api/map/no2/metadata")) {
+        metadataAttempts += 1;
+        if (metadataAttempts < 3) throw new Error("NO2 tile metadata is warming up");
+        return responseFrom(sampleMapMetadata());
+      }
+      if (requestUrl.includes("/api/map/no2/tiles/Annual/2024/4/")) return responseFrom(null);
+      throw new Error(`Unexpected request ${requestUrl}`);
+    };
+
+    const result = await loadNo2MapData(fetcher, "http://backend.test", "Annual", 2024, { retryDelayMs: 0 });
+
+    expect(result.source).toBe("tile");
+    expect(metadataAttempts).toBe(3);
+  });
+
+  it("falls back to grid source when initial NO2 tile coverage is incomplete", async () => {
+    const requests: string[] = [];
+    const fetcher: typeof fetch = async (url) => {
+      const requestUrl = String(url);
+      requests.push(requestUrl);
+      if (requestUrl.endsWith("/api/map/no2/metadata")) return responseFrom(sampleMapMetadata());
+      if (requestUrl.includes("/api/map/no2/tiles/DJF/2024/4/")) return responseFrom(null, { status: 404 });
+      if (requestUrl.endsWith("/api/map/no2/grid/metadata")) return responseFrom(sampleGridMetadata());
+      if (requestUrl.endsWith("/api/map/no2/grid/DJF/2024.json")) return responseFrom(sampleGridFeatureCollection());
+      throw new Error(`Unexpected request ${requestUrl}`);
+    };
+
+    const result = await loadNo2MapData(fetcher, "http://backend.test", "DJF", 2024, { retryDelayMs: 0 });
+
+    if (result.source !== "grid") throw new Error(`Expected grid source, received ${result.source}`);
+    expect(requests.some((request) => request.includes("/api/map/no2/tiles/DJF/2024/4/"))).toBe(true);
+    expect(requests).toContain("http://backend.test/api/map/no2/grid/metadata");
+    expect(result.data.features).toHaveLength(1);
+  });
+
+  it("stops with a clear error after the NO2 map data retry budget is exhausted", async () => {
+    let metadataAttempts = 0;
+    const fetcher: typeof fetch = async () => {
+      metadataAttempts += 1;
+      throw new Error("NO2 tile metadata is still unavailable");
+    };
+
+    await expect(loadNo2MapData(fetcher, "http://backend.test", "Annual", 2024, { retries: 1, retryDelayMs: 0 })).rejects.toThrow(
+      "NO2 tile metadata is still unavailable"
+    );
+    expect(metadataAttempts).toBe(2);
+  });
+
+  it("keeps the map implementation on backend grid or MVT sources instead of synthetic sample surfaces", () => {
+    const source = readFileSync(join(process.cwd(), "src", "components", "TargetNpweiMap.tsx"), "utf-8");
+    const mapExplorerSource = readFileSync(join(process.cwd(), "src", "components", "MapExplorer.tsx"), "utf-8");
+    const webDataClientSource = readFileSync(join(process.cwd(), "src", "data", "webDataClient.ts"), "utf-8");
+    const skeletonSource = readFileSync(join(process.cwd(), "src", "components", "Skeletons.tsx"), "utf-8");
+    const legacyMapSource = readFileSync(join(process.cwd(), "src", "components", "ExposureMap.tsx"), "utf-8");
+
+    expect(source).toContain("MVTLayer");
+    expect(source).toContain("GeoJsonLayer");
+    expect(source).toContain("loadNo2MapData(fetch, apiBaseUrl, season, year)");
+    expect(webDataClientSource).toContain("fetchNo2MapTileMetadata");
+    expect(webDataClientSource).toContain("fetchNo2MapGridMetadata");
+    expect(webDataClientSource).toContain("fetchNo2MapGridData");
+    expect(webDataClientSource).toContain("DEFAULT_NO2_MAP_DATA_RETRIES = 2");
+    expect(webDataClientSource).toContain("NO2_MAP_TILE_PREFLIGHT_LIMIT");
+    expect(source).toContain("getNo2MapSeasonYearRanges(metadata, season, year)");
+    expect(source).toContain("log10(pixel_exposure)");
+    expect(source).toContain("PWE = NO2 x Population, Log Scale");
+    expect(source).toContain('"background-color": "#ffffff"');
+    expect(source).not.toContain("local-country-context-fill");
+    expect(source).not.toContain("local-country-labels");
+    expect(source).not.toContain("COUNTRY_LABELS");
+    expect(source).not.toContain("[238, 247, 242");
+    expect(source).not.toContain("Fallback");
+    expect(source).not.toContain("ScatterplotLayer");
+    expect(source).not.toContain("getSparseNo2PixelSurface");
+    expect(source).not.toContain("interpolateExposureCell");
+    expect(source).not.toContain("SUPPLEMENTAL_EXPOSURE_SOURCES");
+    expect(source).not.toContain("@/data/sampleData");
+    expect(source).toContain("basemaps.cartocdn.com");
+    expect(mapExplorerSource).toContain('import { TargetNpweiMap } from "@/components/TargetNpweiMap";');
+    expect(mapExplorerSource).toContain("<TargetNpweiMap");
+    expect(mapExplorerSource).not.toContain("window.location.reload");
+    expect(mapExplorerSource).not.toContain("sessionStorage");
+    expect(mapExplorerSource).not.toContain("next/dynamic");
+    expect(mapExplorerSource).not.toContain("dynamic<DeferredTargetMapProps>");
+    expect(mapExplorerSource).not.toContain("TARGET_MAP_CHUNK_RELOAD_KEY");
+    expect(skeletonSource).toContain("skeleton-map-panel");
+    expect(skeletonSource).toContain("skeleton-map-zoom");
+    expect(skeletonSource).toContain("skeleton-map-layers");
+    expect(skeletonSource).toContain("skeleton-map-legend");
+    expect(skeletonSource).not.toContain("skeleton-map-land");
+    expect(mapExplorerSource).not.toContain("@/data/sampleData");
+    expect(legacyMapSource).toContain("basemaps.cartocdn.com");
+    expect(legacyMapSource).not.toContain("country-labels");
+    expect(legacyMapSource).not.toContain("COUNTRY_LABELS");
+  });
+
+  it("enables SDF font rendering for remaining outlined map text labels", () => {
+    const files = ["ExposureMap.tsx"];
+
+    files.forEach((file) => {
+      const source = readFileSync(join(process.cwd(), "src", "components", file), "utf-8");
+      const outlinedTextLayers = extractTextLayerProps(source).filter((props) => props.includes("outlineWidth"));
+
+      expect(outlinedTextLayers.length).toBeGreaterThan(0);
+      outlinedTextLayers.forEach((props) => {
+        expect(props).toContain("fontSettings: { sdf: true }");
+      });
+    });
+  });
+
+  it("keeps overview production metrics on generated web_data selectors", () => {
+    const dashboardSource = readFileSync(join(process.cwd(), "src", "components", "DashboardView.tsx"), "utf-8");
+    const rankingSource = readFileSync(join(process.cwd(), "src", "components", "OverviewRankingTable.tsx"), "utf-8");
+    const homeSource = readFileSync(join(process.cwd(), "src", "app", "page.tsx"), "utf-8");
+
+    expect(dashboardSource).toContain("getOverviewSummaryMetrics");
+    expect(dashboardSource).toContain("TargetNpweiMap");
+    expect(rankingSource).toContain("getOverviewCountryRanking");
+    expect(homeSource).toContain("getOverviewHotspots");
+    expect(dashboardSource).not.toContain("@/data/sampleData");
+    expect(rankingSource).not.toContain("@/data/sampleData");
+    expect(homeSource).not.toContain("@/data/sampleData");
+  });
+
 });
 
 function cloneLocalSnapshot(): WebDataSnapshot {
   return structuredClone(getLocalWebDataSnapshot());
 }
 
-function responseFrom(body: unknown) {
+function responseFrom(body: unknown, init: { ok?: boolean; status?: number } = {}) {
+  const status = init.status ?? 200;
   return {
     json: async () => body,
-    ok: true,
-    status: 200
+    ok: init.ok ?? (status >= 200 && status < 300),
+    status
   } as Response;
+}
+
+function sampleMapMetadata() {
+  return {
+    availableYears: [2024],
+    availableSeasons: ["Annual", "DJF", "JJA"],
+    tileUrlTemplate: "/api/map/no2/tiles/{season}/{year}/{z}/{x}/{y}.mvt",
+    bounds: [-18.2, 4.0, 15.2, 16.0],
+    minzoom: 4,
+    maxzoom: 8,
+    layerName: "no2_pixels",
+    valueField: "log10_pixel_exposure",
+    no2Column: { min: 1.0e15, max: 6.0e15 },
+    populationCount: { min: 120, max: 64000 },
+    pixelExposure: { min: 1.0e18, max: 2.5e20 },
+    log10PixelExposure: { min: 18.2, max: 20.4 },
+    rangesBySeasonYear: {
+      Annual: {
+        "2024": {
+          no2Column: { min: 1.0e15, max: 6.0e15 },
+          populationCount: { min: 120, max: 64000 },
+          pixelExposure: { min: 1.0e18, max: 2.5e20 },
+          log10PixelExposure: { min: 18.2, max: 20.4 }
+        }
+      },
+      DJF: {
+        "2024": {
+          no2Column: { min: 2.0e15, max: 6.0e15 },
+          populationCount: { min: 120, max: 64000 },
+          pixelExposure: { min: 1.3e19, max: 1.3e20 },
+          log10PixelExposure: { min: 19.1, max: 20.1 }
+        }
+      },
+      JJA: {
+        "2024": {
+          no2Column: { min: 1.0e15, max: 3.0e15 },
+          populationCount: { min: 120, max: 64000 },
+          pixelExposure: { min: 3.0e18, max: 2.5e19 },
+          log10PixelExposure: { min: 18.5, max: 19.4 }
+        }
+      }
+    },
+    units: {
+      no2Column: "molec cm-2",
+      populationCount: "people",
+      pixelExposure: "molec cm-2 people",
+      log10PixelExposure: "log10(molec cm-2 people)",
+      npwei: "normalized 0-100 index"
+    },
+    generatedAt: "2026-01-01T00:00:00+00:00"
+  };
+}
+
+function sampleGridMetadata(): No2MapGridMetadata {
+  return {
+    availableYears: [2024],
+    availableSeasons: ["Annual", "DJF", "JJA"],
+    dataUrlTemplate: "/api/map/no2/grid/{season}/{year}.json",
+    bounds: [-18.2, 4.0, 15.2, 16.0],
+    layerName: "no2_population_grid",
+    valueField: "log10_pixel_exposure",
+    no2Column: { min: 1.0e15, max: 6.0e15 },
+    populationCount: { min: 120, max: 64000 },
+    pixelExposure: { min: 1.0e18, max: 2.5e20 },
+    log10PixelExposure: { min: 18.2, max: 20.4 },
+    units: {
+      no2Column: "molec cm-2",
+      populationCount: "people",
+      pixelExposure: "molec cm-2 people",
+      log10PixelExposure: "log10(molec cm-2 people)",
+      npwei: "normalized 0-100 index"
+    },
+    generatedAt: "2026-01-01T00:00:00+00:00"
+  };
+}
+
+function sampleGridFeatureCollection() {
+  return {
+    type: "FeatureCollection",
+    features: [{ type: "Feature", properties: { log10_pixel_exposure: 19 }, geometry: null }]
+  };
+}
+
+function extractTextLayerProps(source: string): string[] {
+  const blocks: string[] = [];
+  const marker = "new TextLayer";
+  let markerIndex = source.indexOf(marker);
+
+  while (markerIndex !== -1) {
+    const openBraceIndex = source.indexOf("{", markerIndex);
+    if (openBraceIndex === -1) break;
+
+    let depth = 0;
+    let blockEndIndex = -1;
+    for (let index = openBraceIndex; index < source.length; index += 1) {
+      const character = source[index];
+      if (character === "{") depth += 1;
+      if (character === "}") depth -= 1;
+      if (depth === 0) {
+        blockEndIndex = index;
+        break;
+      }
+    }
+
+    if (blockEndIndex === -1) break;
+    blocks.push(source.slice(openBraceIndex, blockEndIndex + 1));
+    markerIndex = source.indexOf(marker, blockEndIndex + 1);
+  }
+
+  return blocks;
 }

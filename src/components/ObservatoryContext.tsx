@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { Filters } from "@/types/exposure";
-import { DEFAULT_FILTERS, YEARS } from "@/data/sampleData";
+import { DEFAULT_FILTERS, getWebDataYears } from "@/data/webData";
 
 export type ObservatoryFilters = Filters & {
   regionId: string;
@@ -19,6 +19,7 @@ interface ObservatoryContextValue {
   applyStagedFilters: () => void;
 }
 
+const YEARS = getWebDataYears();
 const defaultFilters: ObservatoryFilters = {
   ...DEFAULT_FILTERS,
   regionId: DEFAULT_FILTERS.regionId ?? "west-africa",

@@ -170,6 +170,12 @@ describe("backend web_data client", () => {
     );
   });
 
+  it("normalizes null NO2 map season-year definition as omitted", () => {
+    const metadata = normalizeNo2MapTileMetadata({ ...sampleMapMetadata(), seasonYearDefinition: null });
+
+    expect(metadata.seasonYearDefinition).toBeUndefined();
+  });
+
   it("rejects map metadata that is not keyed to log10 pixel exposure", () => {
     const metadata = { ...sampleMapMetadata(), valueField: "npwei" };
 
@@ -184,6 +190,12 @@ describe("backend web_data client", () => {
     expect(buildNo2GridDataUrl(metadata, "DJF", 2024, "http://backend.test")).toBe(
       "http://backend.test/api/map/no2/grid/DJF/2024.json"
     );
+  });
+
+  it("normalizes null NO2 grid season-year definition as omitted", () => {
+    const metadata = normalizeNo2MapGridMetadata({ ...sampleGridMetadata(), seasonYearDefinition: null });
+
+    expect(metadata.seasonYearDefinition).toBeUndefined();
   });
 
   it("rejects grid metadata that is not keyed to log10 pixel exposure", () => {

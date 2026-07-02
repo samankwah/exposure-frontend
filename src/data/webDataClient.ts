@@ -451,7 +451,7 @@ function normalizeNo2MapMetadataCommon(body: Record<string, unknown>) {
     },
     generatedAt: asString(body.generatedAt, "generatedAt"),
     seasonYearDefinition:
-      body.seasonYearDefinition === undefined
+      body.seasonYearDefinition === undefined || body.seasonYearDefinition === null
         ? undefined
         : asString(body.seasonYearDefinition, "seasonYearDefinition")
   };

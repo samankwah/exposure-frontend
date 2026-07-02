@@ -14,6 +14,7 @@ import {
   getCityRow,
   getCityRows,
   getHealthSeasonSummary,
+  getWebDataYearRange,
   type CityNpweiRow,
   type RiskTierLabel,
   type WebDataSeason
@@ -38,6 +39,10 @@ export function CitiesPage() {
     void dataVersion;
     return getCityRows(season);
   }, [dataVersion, season]);
+  const yearRange = useMemo(() => {
+    void dataVersion;
+    return getWebDataYearRange();
+  }, [dataVersion]);
   const [selectedCity, setSelectedCity] = useState(() => rows.find((row) => row.name === DEFAULT_CITY)?.name ?? rows[0]?.name ?? "Lagos");
   const selected = getCityRow(selectedCity, season);
   const healthSummary = getHealthSeasonSummary(season);
@@ -102,7 +107,7 @@ export function CitiesPage() {
                 Cities at Risk
               </span>
               <h1 id="cities-title">Urban NO{"\u2082"} Exposure Hotspots</h1>
-              <p>Population-weighted exposure across 27 West African cities · 2020–2024</p>
+              <p>Population-weighted exposure across {rows.length} West African cities - {yearRange}</p>
             </div>
 
             <div className="cities-export-actions" aria-label="City exports">
@@ -183,7 +188,7 @@ export function CitiesPage() {
               <header className="data-panel-header">
                 <div>
                   <h2>City Exposure Rankings</h2>
-                  <p>{SEASON_LABELS[season]} · 2020–2024</p>
+                  <p>{SEASON_LABELS[season]} - {yearRange}</p>
                 </div>
                 <label className="city-search-control">
                   <Search size={14} aria-hidden />

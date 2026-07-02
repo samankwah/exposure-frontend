@@ -14,6 +14,7 @@ import {
   SEASON_LABELS,
   getCityRows,
   getCountryRows,
+  getWebDataYears,
   getWebDataSummary,
   webDataSummary
 } from "@/data/webData";
@@ -57,7 +58,9 @@ function toCsv(rows: Array<Array<number | string>>) {
 
 export function TrendsPage() {
   const { version: dataVersion } = useBackendWebData();
-  const years = getWebDataSummary().years_covered.length > 0 ? getWebDataSummary().years_covered : webDataSummary.years_covered;
+  const years = Array.from(
+    new Set([...(getWebDataSummary().years_covered.length > 0 ? getWebDataSummary().years_covered : webDataSummary.years_covered), ...getWebDataYears()])
+  ).sort((a, b) => a - b);
   const [country, setCountry] = useState("all");
   const [city, setCity] = useState("all");
   const [year, setYear] = useState(years[years.length - 1] ?? 2024);

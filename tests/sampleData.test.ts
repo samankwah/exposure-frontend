@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   COUNTRIES,
   DEFAULT_FILTERS,
+  YEARS,
   getAnnualTrend,
   getCountryRanking,
   getHotspotThreshold,
@@ -38,7 +39,7 @@ describe("sample analytics", () => {
   });
 
   it("builds annual and monthly chart series", () => {
-    expect(getAnnualTrend(DEFAULT_FILTERS)).toHaveLength(5);
+    expect(getAnnualTrend(DEFAULT_FILTERS)).toHaveLength(YEARS.length);
     expect(getMonthlyCycle(DEFAULT_FILTERS)).toHaveLength(12);
     expect(COUNTRIES.length).toBeGreaterThan(10);
   });
@@ -57,11 +58,14 @@ describe("sample analytics", () => {
     expect(no2Rows[0].value).not.toBe(npweiRows[0].value);
   });
 
-  it("spans the eastern Chad and Cameroon shapefile extent in the default raster", () => {
+  it("keeps the default raster inside the West Africa country boundary extent", () => {
     const surface = getInterpolatedNo2Cells(DEFAULT_FILTERS, 0.5);
-    const centroids = surface.features.map((feature) => feature.properties.id.split("cell-")[1].split("-").map(Number));
+    const coordinates = surface.features.flatMap((feature) => feature.geometry.coordinates[0]);
 
-    expect(centroids.some(([longitude, latitude]) => longitude > 22 && latitude > 12 && latitude < 20)).toBe(true);
-    expect(centroids.some(([longitude, latitude]) => longitude > 15.5 && latitude < 3.5)).toBe(true);
+    expect(coordinates.length).toBeGreaterThan(0);
+    expect(coordinates.every(([longitude]) => longitude <= 16.2)).toBe(true);
+    expect(coordinates.every(([, latitude]) => latitude >= 4.0)).toBe(true);
+    expect(coordinates.some(([longitude, latitude]) => longitude > 15.5 && latitude < 3.5)).toBe(false);
+    expect(coordinates.some(([longitude]) => longitude > 22)).toBe(false);
   });
 });

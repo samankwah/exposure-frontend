@@ -8,6 +8,7 @@ import {
   ScatterplotLayer,
   TextLayer,
 } from "@deck.gl/layers";
+import * as maplibregl from "maplibre-gl";
 import MapLibreMap, { ScaleControl } from "react-map-gl/maplibre";
 import { Layers, Minus, Plus } from "lucide-react";
 import { MapPanelSkeleton } from "@/components/Skeletons";
@@ -19,7 +20,7 @@ import type {
   LayerKey,
 } from "@/types/exposure";
 import africaContourMap from "@/data/africaContourMap.json";
-import abnMapBoundary from "@/data/abnMapBoundary.json";
+import westAfricaBoundary from "@/data/westAfricaBoundary.json";
 import {
   CITIES,
   INTERPOLATION_CELL_DEGREES,
@@ -47,6 +48,13 @@ const MAP_STYLE = {
     },
   },
   layers: [
+    {
+      id: "local-background",
+      type: "background",
+      paint: {
+        "background-color": "#ffffff",
+      },
+    },
     {
       id: "carto-light",
       type: "raster",
@@ -351,7 +359,7 @@ export function ExposureMap({
     activeLayers.no2
       ? new GeoJsonLayer({
           id: "country-boundary-halo",
-          data: abnMapBoundary as any,
+          data: westAfricaBoundary as any,
           pickable: false,
           stroked: true,
           filled: false,
@@ -363,7 +371,7 @@ export function ExposureMap({
     activeLayers.no2
       ? new GeoJsonLayer({
           id: "country-boundaries-overlay",
-          data: abnMapBoundary as any,
+          data: westAfricaBoundary as any,
           pickable: false,
           stroked: true,
           filled: false,
@@ -475,6 +483,7 @@ export function ExposureMap({
           getPixelOffset: [0, -7],
           outlineWidth: 2,
           outlineColor: [255, 255, 255, 220],
+          fontSettings: { sdf: true },
           fontWeight: 500,
           pickable: false,
         })
@@ -519,7 +528,7 @@ export function ExposureMap({
         viewState={viewState}
         layers={layers}
       >
-        <MapLibreMap mapStyle={MAP_STYLE as any} reuseMaps>
+        <MapLibreMap mapLib={maplibregl as any} mapStyle={MAP_STYLE as any} reuseMaps>
           {controls ? (
             <ScaleControl
               position={legend === "column" ? "bottom-right" : "bottom-left"}

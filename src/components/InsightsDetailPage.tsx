@@ -11,7 +11,9 @@ import {
 import {
   getAverageCityNpwei,
   getCityRows,
-  getHealthSeasonSummary
+  getCountryRows,
+  getHealthSeasonSummary,
+  getWebDataYearRange
 } from "@/data/webData";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -29,6 +31,9 @@ export function InsightsDetailPage() {
   const annualHealth = getHealthSeasonSummary("Annual");
   const topCity = getCityRows("Annual")[0];
   const dryWetGap = Math.round(getAverageCityNpwei("DJF") - getAverageCityNpwei("JJA"));
+  const yearRange = getWebDataYearRange();
+  const cityCount = getCityRows("Annual").length;
+  const countryCount = getCountryRows("Annual").length;
 
   return (
     <main className="insights-detail-page">
@@ -43,7 +48,9 @@ export function InsightsDetailPage() {
                 Platform insights
               </span>
               <h1 id="insights-detail-title">West Africa NO{"\u2082"} Exposure at a Glance</h1>
-              <p>Key metrics and trends - Sentinel-5P TROPOMI - 2020-2024 - 27 cities across 15 countries</p>
+              <p>
+                Key metrics and trends - Sentinel-5P TROPOMI - {yearRange} - {cityCount} cities across {countryCount} countries
+              </p>
             </div>
             <Link className="insights-dashboard-link" href="/map">
               <span>Explore Map</span>
@@ -84,7 +91,7 @@ export function InsightsDetailPage() {
 
           <section className="insights-chart-grid" aria-label="Exposure charts">
             <InsightPanel
-              label="2020-2024"
+              label={yearRange}
               subtitle="Annual - DJF - JJA - West Africa average"
               title="Yearly NPWEI Trend"
             >

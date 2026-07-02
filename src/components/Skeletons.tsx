@@ -39,9 +39,6 @@ export function MapPanelSkeleton({ compact = false }: { compact?: boolean }) {
     <div className={compact ? "map-panel compact skeleton-map-panel" : "map-panel skeleton-map-panel"} aria-hidden="true">
       <span className="skeleton-map-zoom" />
       <span className="skeleton-map-layers" />
-      <span className="skeleton-map-land skeleton-map-land-a" />
-      <span className="skeleton-map-land skeleton-map-land-b" />
-      <span className="skeleton-map-land skeleton-map-land-c" />
       <span className="skeleton-map-legend" />
     </div>
   );

@@ -34,6 +34,11 @@ export const rootMetadata: Metadata = {
   authors: [{ name: "CLeNE Research Team" }],
   creator: "CLeNE",
   publisher: "CLeNE",
+  icons: {
+    icon: [{ url: "/clene-logo.jpeg", type: "image/jpeg" }],
+    shortcut: ["/clene-logo.jpeg"],
+    apple: [{ url: "/clene-logo.jpeg", type: "image/jpeg" }]
+  },
   alternates: {
     canonical: "/"
   },

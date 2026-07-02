@@ -15,13 +15,30 @@ import {
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { BrandedNavbar } from "@/components/BrandedNavbar";
+import {
+  getCityRows,
+  getCountryRows,
+  getWebDataObservationPeriod,
+  getWebDataYearRange
+} from "@/data/webData";
 
-const platformBadges = ["Sentinel-5P TROPOMI", "NASA Gridded Population 2020", "2020-2024", "27 Cities", "15 Countries", "KNUST CAHL"];
+const yearRange = getWebDataYearRange();
+const observationPeriod = getWebDataObservationPeriod();
+const cityCount = getCityRows("Annual").length;
+const countryCount = getCountryRows("Annual").length;
+const platformBadges = [
+  "Sentinel-5P TROPOMI",
+  "NASA Gridded Population 2020",
+  yearRange,
+  `${cityCount} Cities`,
+  `${countryCount} Countries`,
+  "KNUST CAHL"
+];
 
 const dataSources = [
   {
     dataset: "TROPOMI NO2 L3",
-    period: "Jan 2020-Dec 2024",
+    period: observationPeriod,
     resolution: "0.01 degree",
     source: "ESA Sentinel-5P / NASA GES DISC",
     use: "NO2 column"
@@ -42,7 +59,7 @@ const dataSources = [
   },
   {
     dataset: "Fire Radiative Power",
-    period: "2020-2024",
+    period: yearRange,
     resolution: "375 m",
     source: "NASA FIRMS VIIRS",
     use: "Fire driver data"
@@ -90,7 +107,7 @@ const aboutCards: Array<{ body: ReactNode; icon: LucideIcon; title: string }> = 
 
 const methodologySteps: Array<{ body: string; icon: LucideIcon; title: string }> = [
   {
-    body: "Monthly TROPOMI NO2 L3 files downloaded Jan 2020-Dec 2024. NASA Gridded Population 2020 at 0.1 degree clipped to West Africa.",
+    body: `Monthly TROPOMI NO2 L3 files downloaded ${observationPeriod}. NASA Gridded Population 2020 at 0.1 degree clipped to West Africa.`,
     icon: Database,
     title: "Data Acquisition"
   },
@@ -105,7 +122,7 @@ const methodologySteps: Array<{ body: string; icon: LucideIcon; title: string }>
     title: "PWE Computation"
   },
   {
-    body: "Raw PWE is normalised 0-100 and exported as JSON plus georeferenced PNG tiles for Leaflet.",
+    body: "Raw PWE is normalised 0-100 and exported as JSON plus vector tiles for MapLibre.",
     icon: Settings,
     title: "Normalisation"
   }
@@ -127,7 +144,7 @@ export function AboutPage() {
               <h1 id="about-title">CLeNE - West Africa NO{"\u2082"} Exposure Intelligence Platform</h1>
               <p>
                 An open-access satellite-derived dashboard tracking population-weighted NO{"\u2082"} exposure across West
-                African urban centres from 2020 to 2024. Built by the Climate and Health Research Lab (CAHL) at KNUST,
+                African urban centres from {yearRange}. Built by the Climate and Health Research Lab (CAHL) at KNUST,
                 Kumasi, Ghana.
               </p>
               <div className="about-badge-row" aria-label="Platform coverage">

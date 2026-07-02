@@ -1,13 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DeckGL from "@deck.gl/react";
 import { GeoJsonLayer } from "@deck.gl/layers";
+import { MVTLayer } from "@deck.gl/geo-layers";
+import * as maplibregl from "maplibre-gl";
 import MapLibreMap, { ScaleControl } from "react-map-gl/maplibre";
 import { Minus, Plus } from "lucide-react";
 import { MapPanelSkeleton } from "@/components/Skeletons";
-import abnMapBoundary from "@/data/abnMapBoundary.json";
-import africaContourMap from "@/data/africaContourMap.json";
+import westAfricaBoundary from "@/data/westAfricaBoundary.json";
+import {
+  buildNo2TileUrlTemplate,
+  getApiBaseUrl,
+  getNo2MapSeasonYearRanges,
+  loadNo2MapData,
+  type No2MapGridFeatureCollection,
+  type No2MapGridMetadata,
+  type No2MapTileMetadata,
+  type NumericRange
+} from "@/data/webDataClient";
 import type { CityNpweiRow, WebDataSeason } from "@/data/webData";
 
 const MAP_STYLE = {
@@ -27,12 +38,19 @@ const MAP_STYLE = {
   },
   layers: [
     {
+      id: "local-background",
+      type: "background",
+      paint: {
+        "background-color": "#ffffff"
+      }
+    },
+    {
       id: "carto-light",
       type: "raster",
       source: "carto-light",
       paint: {
         "raster-opacity": 0.94,
-        "raster-saturation": -0.22
+        "raster-saturation": -0.2
       }
     }
   ]
@@ -49,88 +67,135 @@ const INITIAL_VIEW_STATE = {
 };
 
 type MapViewState = typeof INITIAL_VIEW_STATE;
-type PixelFeature = {
-  type: "Feature";
-  properties: {
-    city: string;
-    country: string;
-    column?: number;
-    npwei: number;
-    population: number;
-    value: number;
-  };
-  geometry: {
-    type: "Polygon";
-    coordinates: Array<Array<[number, number]>>;
-  };
-};
-type PixelFeatureCollection = {
-  type: "FeatureCollection";
-  features: PixelFeature[];
-};
+type TargetMapLayerMode = "no2" | "population";
+type No2MapDisplayMetadata = No2MapTileMetadata | No2MapGridMetadata;
+type MapDataState =
+  | { status: "loading" }
+  | { status: "ready"; source: "tile"; metadata: No2MapTileMetadata }
+  | { status: "ready"; source: "grid"; metadata: No2MapGridMetadata; data: No2MapGridFeatureCollection }
+  | { status: "error"; message: string };
 
-export type TargetMapLayerMode = "no2" | "population";
-
-type PixelSource = {
-  country: string;
-  lat: number;
-  lon: number;
-  name: string;
-  npwei: number;
-  population: number;
-  populationWeight: number;
-  radius: number;
-  value: number;
+type No2TileProperties = {
+  city?: string;
+  country?: string;
+  density_people_per_km2?: number;
+  lat?: number;
+  lon?: number;
+  log10_pixel_exposure?: number;
+  no2_column_molec_cm2?: number;
+  npwei?: number;
+  pixel_exposure?: number;
+  population_count?: number;
+  season?: string;
+  year?: number;
 };
 
-const SUPPLEMENTAL_EXPOSURE_SOURCES = [
-  { name: "Conakry", country: "Guinea", lon: -13.68, lat: 9.64, npwei: 27, population: 2.05, radius: 1.18 },
-  { name: "Freetown", country: "Sierra Leone", lon: -13.23, lat: 8.48, npwei: 25, population: 1.21, radius: 1.08 },
-  { name: "Monrovia", country: "Liberia", lon: -10.8, lat: 6.31, npwei: 12, population: 1.67, radius: 0.86 },
-  { name: "Bissau corridor", country: "Guinea-Bissau", lon: -15.1, lat: 11.85, npwei: 12, population: 0.6, radius: 0.72 },
-  { name: "Niamey", country: "Niger", lon: 2.11, lat: 13.51, npwei: 18, population: 1.39, radius: 1.02 },
-  { name: "Maroua corridor", country: "Cameroon", lon: 14.25, lat: 10.6, npwei: 20, population: 0.95, radius: 0.9 }
-] as const;
+type DeckFeature = {
+  properties?: No2TileProperties;
+};
+
+const AFFECTED_PWE_DENSITY_THRESHOLD = 50;
+const FILTERED_GRID_MIN_RADIUS_DEGREES = 0.65;
+const FILTERED_GRID_MAX_RADIUS_DEGREES = 1.35;
 
 export function TargetNpweiMap({
+  filterActive = false,
   rows,
   season,
   year,
   month,
   layerMode = "no2"
 }: {
+  filterActive?: boolean;
   rows: CityNpweiRow[];
   season: WebDataSeason;
   year: number;
   month: number;
   layerMode?: TargetMapLayerMode;
 }) {
+  void month;
   const [isClient, setIsClient] = useState(false);
-  const [surface, setSurface] = useState<PixelFeatureCollection | null>(null);
+  const [mapDataState, setMapDataState] = useState<MapDataState>({ status: "loading" });
   const [viewState, setViewState] = useState<MapViewState>(INITIAL_VIEW_STATE);
+  const apiBaseUrl = getApiBaseUrl();
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   useEffect(() => {
-    if (!isClient) return;
-
     let canceled = false;
-    setSurface(null);
+    setMapDataState({ status: "loading" });
 
-    const timeoutId = window.setTimeout(() => {
-      const nextSurface = getUrbanPixelSurface(rows, season, year, month, layerMode);
-      if (!canceled) setSurface(nextSurface);
-    }, 0);
+    loadNo2MapData(fetch, apiBaseUrl, season, year)
+      .then((mapData) => {
+        if (!canceled) setMapDataState({ status: "ready", ...mapData });
+      })
+      .catch((error: unknown) => {
+        if (!canceled) {
+          const message = error instanceof Error ? error.message : "NO2 population grid is unavailable";
+          setMapDataState({ status: "error", message });
+        }
+      });
 
     return () => {
       canceled = true;
-      window.clearTimeout(timeoutId);
     };
-  }, [isClient, layerMode, month, rows, season, year]);
+  }, [apiBaseUrl, season, year]);
 
-  if (!isClient || !surface) return <MapPanelSkeleton />;
+  const visibleFeatureKeys = useMemo(() => new Set(rows.map((row) => featureKey(row.country, row.name))), [rows]);
+  const maskedGridData = useMemo(() => {
+    if (mapDataState.status !== "ready" || mapDataState.source !== "grid") return null;
+    const includeFeature = layerMode === "population" ? isPopulationFeature : isAffectedPweFeature;
+
+    return {
+      ...mapDataState.data,
+      features: mapDataState.data.features.filter((feature) => {
+        const properties = feature.properties ?? {};
+        return (
+          isInsideWestAfricaBoundary(properties) &&
+          includeFeature(properties) &&
+          isVisibleFeature(properties, visibleFeatureKeys, rows, filterActive)
+        );
+      })
+    };
+  }, [filterActive, layerMode, mapDataState, rows, visibleFeatureKeys]);
+  const clippedLog10ExposureRange = useMemo(() => {
+    if (mapDataState.status !== "ready" || mapDataState.source !== "grid") return null;
+    return getClippedNumericRange(
+      mapDataState.data,
+      "log10_pixel_exposure",
+      0.02,
+      0.98,
+      (properties) =>
+        isInsideWestAfricaBoundary(properties) &&
+        isAffectedPweFeature(properties) &&
+        isVisibleFeature(properties, visibleFeatureKeys, rows, filterActive)
+    );
+  }, [filterActive, mapDataState, rows, visibleFeatureKeys]);
+  const clippedPopulationRange = useMemo(() => {
+    if (mapDataState.status !== "ready" || mapDataState.source !== "grid") return null;
+    return getClippedNumericRange(
+      mapDataState.data,
+      "population_count",
+      0.02,
+      0.98,
+      (properties) =>
+        isInsideWestAfricaBoundary(properties) &&
+        isPopulationFeature(properties) &&
+        isVisibleFeature(properties, visibleFeatureKeys, rows, filterActive)
+    );
+  }, [filterActive, mapDataState, rows, visibleFeatureKeys]);
+  const updateViewState = (nextViewState: Partial<MapViewState>) => {
+    setViewState({
+      ...INITIAL_VIEW_STATE,
+      ...nextViewState,
+      minZoom: INITIAL_VIEW_STATE.minZoom,
+      maxZoom: INITIAL_VIEW_STATE.maxZoom,
+      pitch: 0,
+      bearing: 0
+    });
+  };
 
   const zoomMap = (step: number) => {
     setViewState((current) => ({
@@ -139,67 +204,109 @@ export function TargetNpweiMap({
     }));
   };
 
+  if (!isClient || mapDataState.status === "loading") return <MapPanelSkeleton />;
+  if (mapDataState.status === "error") return <UnavailableMapPanel message={mapDataState.message} />;
+
+  const { metadata } = mapDataState;
+  const seasonYearRanges = getNo2MapSeasonYearRanges(metadata, season, year);
+  const log10ExposureColorRange = clippedLog10ExposureRange ?? seasonYearRanges?.log10PixelExposure ?? metadata.log10PixelExposure;
+  const populationColorRange = clippedPopulationRange ?? seasonYearRanges?.populationCount ?? metadata.populationCount;
+  if (!metadata.availableSeasons.includes(season)) {
+    return <UnavailableMapPanel message={`Backend NO2 population grid is unavailable for ${season}.`} />;
+  }
+  if (!metadata.availableYears.includes(year)) {
+    return <UnavailableMapPanel message={`Backend NO2 population grid is unavailable for ${year}.`} />;
+  }
+
+  const no2Layer =
+    mapDataState.source === "tile"
+      ? new MVTLayer({
+          id: `no2-pixel-tiles-${season}-${year}-${layerMode}`,
+          data: buildNo2TileUrlTemplate(mapDataState.metadata, season, year, apiBaseUrl),
+          minZoom: mapDataState.metadata.minzoom,
+          maxZoom: mapDataState.metadata.maxzoom,
+          pickable: true,
+          filled: true,
+          stroked: false,
+          opacity: layerMode === "population" ? 0.76 : 0.94,
+          getFillColor: (feature: DeckFeature) =>
+            getFeatureFillColor(
+              feature.properties ?? {},
+              layerMode,
+              visibleFeatureKeys,
+              rows,
+              filterActive,
+              log10ExposureColorRange,
+              populationColorRange
+            ),
+          updateTriggers: {
+            getFillColor: [
+              season,
+              year,
+              layerMode,
+              metadata.generatedAt,
+              filterActive,
+              rows,
+              log10ExposureColorRange.min,
+              log10ExposureColorRange.max,
+              populationColorRange.min,
+              populationColorRange.max
+            ]
+          }
+        })
+      : new GeoJsonLayer({
+          id: `no2-population-grid-${season}-${year}-${layerMode}`,
+          data: (maskedGridData ?? mapDataState.data) as any,
+          pickable: true,
+          filled: true,
+          stroked: false,
+          opacity: layerMode === "population" ? 0.72 : 0.96,
+          getFillColor: (feature: DeckFeature) =>
+            getFeatureFillColor(
+              feature.properties ?? {},
+              layerMode,
+              visibleFeatureKeys,
+              rows,
+              filterActive,
+              log10ExposureColorRange,
+              populationColorRange
+            ),
+          updateTriggers: {
+            getFillColor: [
+              season,
+              year,
+              layerMode,
+              metadata.generatedAt,
+              filterActive,
+              rows,
+              log10ExposureColorRange.min,
+              log10ExposureColorRange.max,
+              populationColorRange.min,
+              populationColorRange.max
+            ]
+          }
+        });
   const layers = [
-    new GeoJsonLayer({
-      id: "africa-contour-fill",
-      data: africaContourMap as any,
-      pickable: false,
-      stroked: false,
-      filled: true,
-      getFillColor: [232, 238, 231, 20]
-    }),
-    new GeoJsonLayer({
-      id: "africa-contour-outline",
-      data: africaContourMap as any,
-      pickable: false,
-      stroked: true,
-      filled: false,
-      lineWidthUnits: "pixels",
-      lineWidthMinPixels: 1,
-      getLineColor: [115, 134, 150, 95]
-    }),
-    new GeoJsonLayer({
-      id: "west-africa-boundary-fill",
-      data: abnMapBoundary as any,
-      pickable: false,
-      stroked: false,
-      filled: true,
-      getFillColor: [255, 255, 255, 22]
-    }),
-    new GeoJsonLayer({
-      id: `${layerMode}-urban-pixels`,
-      data: surface as any,
-      pickable: true,
-      stroked: false,
-      filled: true,
-      opacity: layerMode === "population" ? 0.78 : 0.86,
-      getFillColor: (feature: any) =>
-        layerMode === "population"
-          ? getPopulationColor(Number(feature.properties?.value ?? 0), 208)
-          : getNpweiColor(Number(feature.properties?.value ?? 0), 214),
-      updateTriggers: {
-        getFillColor: [season, year, month, layerMode]
-      }
-    }),
+    no2Layer,
     new GeoJsonLayer({
       id: "west-africa-boundary-halo",
-      data: abnMapBoundary as any,
+      data: westAfricaBoundary as any,
       pickable: false,
       stroked: true,
       filled: false,
       lineWidthUnits: "pixels",
-      lineWidthMinPixels: 2.5,
-      getLineColor: [255, 255, 255, 210]
+      lineWidthMinPixels: 2,
+      getLineColor: [255, 255, 255, 180]
     }),
     new GeoJsonLayer({
       id: "west-africa-boundary-outline",
-      data: abnMapBoundary as any,
+      data: westAfricaBoundary as any,
       pickable: false,
       stroked: true,
       filled: false,
       lineWidthUnits: "pixels",
-      lineWidthMinPixels: 1.05,
-      getLineColor: [71, 93, 116, 170]
+      lineWidthMinPixels: 1.15,
+      getLineColor: [0, 0, 0, 225]
     })
   ];
 
@@ -209,28 +316,22 @@ export function TargetNpweiMap({
         controller
         getCursor={({ isDragging, isHovering }) => (isDragging ? "grabbing" : isHovering ? "pointer" : "grab")}
         getTooltip={({ object }) => {
-          const feature = object as PixelFeature | null;
-          if (!feature) return null;
-          const population = feature.properties.population.toFixed(2);
-          const metric = layerMode === "population" ? `Urban population ${population}M` : `NPWEI ${Math.round(feature.properties.npwei)}/100`;
+          const properties = (object as DeckFeature | null)?.properties;
+          if (!properties || !isVisibleFeature(properties, visibleFeatureKeys, rows, filterActive)) return null;
+          if (!isInsideWestAfricaBoundary(properties)) return null;
+          if (layerMode === "no2" && !isAffectedPweFeature(properties)) return null;
+          if (layerMode === "population" && !isPopulationFeature(properties)) return null;
           return {
-            text: `${feature.properties.city}, ${feature.properties.country}\n${metric}`
+            text: getTooltipText(properties, metadata)
           };
         }}
         layers={layers}
         onViewStateChange={({ viewState: nextViewState }) => {
-          setViewState({
-            ...INITIAL_VIEW_STATE,
-            ...(nextViewState as Partial<MapViewState>),
-            minZoom: INITIAL_VIEW_STATE.minZoom,
-            maxZoom: INITIAL_VIEW_STATE.maxZoom,
-            pitch: 0,
-            bearing: 0
-          });
+          updateViewState(nextViewState as Partial<MapViewState>);
         }}
         viewState={viewState}
       >
-        <MapLibreMap mapStyle={MAP_STYLE as any} reuseMaps>
+        <MapLibreMap mapLib={maplibregl as any} mapStyle={MAP_STYLE as any} reuseMaps>
           <ScaleControl position="bottom-left" />
         </MapLibreMap>
       </DeckGL>
@@ -242,322 +343,149 @@ export function TargetNpweiMap({
           <Minus size={17} aria-hidden />
         </button>
       </div>
+      <No2MapLegend
+        layerMode={layerMode}
+        log10ExposureRange={log10ExposureColorRange}
+        populationRange={populationColorRange}
+      />
     </div>
   );
 }
 
-function getUrbanPixelSurface(
+function UnavailableMapPanel({ message }: { message: string }) {
+  return (
+    <div className="map-panel target-npwei-map-panel target-map-unavailable">
+      <strong>NO2 population grid unavailable</strong>
+      <span>{message}</span>
+    </div>
+  );
+}
+
+function No2MapLegend({
+  layerMode,
+  log10ExposureRange,
+  populationRange
+}: {
+  layerMode: TargetMapLayerMode;
+  log10ExposureRange: NumericRange;
+  populationRange: NumericRange;
+}) {
+  const range = layerMode === "population" ? populationRange : log10ExposureRange;
+  const title = layerMode === "population" ? "Population count" : "PWE = NO2 x Population, Log Scale";
+  const middle = range.min + (range.max - range.min) / 2;
+
+  return (
+    <div className={layerMode === "population" ? "target-map-legend population" : "target-map-legend"} aria-hidden>
+      <strong>{title}</strong>
+      <i />
+      <div className="target-map-legend-labels">
+        <span className="target-map-legend-end target-map-legend-low">Low</span>
+        <span className="target-map-legend-end target-map-legend-high">High</span>
+        <span className="target-map-legend-value target-map-legend-min">{formatLegendValue(range.min, layerMode)}</span>
+        <span className="target-map-legend-value target-map-legend-mid">{formatLegendValue(middle, layerMode)}</span>
+        <span className="target-map-legend-value target-map-legend-max">{formatLegendValue(range.max, layerMode)}</span>
+      </div>
+    </div>
+  );
+}
+
+function isVisibleFeature(
+  properties: Partial<No2TileProperties> | Record<string, unknown>,
+  visibleFeatureKeys: Set<string>,
   rows: CityNpweiRow[],
-  season: WebDataSeason,
-  year: number,
-  month: number,
-  layerMode: TargetMapLayerMode
-): PixelFeatureCollection {
-  if (layerMode === "no2") {
-    return getSparseNo2PixelSurface(rows, season, year, month);
-  }
-
-  const features: PixelFeature[] = [];
-  const selectedMonthBoost = getMonthBoost(month);
-  const selectedSeasonBoost = season === "DJF" ? 1.08 : season === "JJA" ? 0.94 : 1;
-  const yearBoost = 0.96 + Math.max(0, Math.min(4, year - 2020)) * 0.01;
-  const valueBoost = selectedMonthBoost * selectedSeasonBoost * yearBoost;
-  const cellSize = 0.12;
-  const maxUrbanPop = Math.max(1, ...rows.map((city) => city.urbanPop));
-  const sources = rows.map((city) => getPixelSource(city, valueBoost, maxUrbanPop, layerMode));
-  const selectedCity = rows.length === 1 ? rows[0] : null;
-  const bounds = selectedCity ? getCityBounds(selectedCity) : [-17.8, 4.45, 14.15, 15.95];
-
-  for (let longitude = bounds[0]; longitude <= bounds[2]; longitude += cellSize) {
-    for (let latitude = bounds[1]; latitude <= bounds[3]; latitude += cellSize) {
-      const centroid: [number, number] = [round(longitude + cellSize / 2, 3), round(latitude + cellSize / 2, 3)];
-      const influence = interpolateNpweiCell(centroid, sources);
-      if (!influence) continue;
-      if (!pointInGeoJsonFeatureCollection(centroid, abnMapBoundary as any)) continue;
-
-      const seed = hashString(`${round(longitude, 2)}:${round(latitude, 2)}:${season}`);
-      const maskNoise = deterministicNoise(seed, 1, 17);
-      const textureNoise = deterministicNoise(seed, 2, 23);
-      const threshold = selectedCity ? 0.17 : 0.25;
-      if (influence.coverage < threshold + maskNoise * 0.16 && influence.value < 72) continue;
-
-      const texture = (textureNoise - 0.5) * 13 + (maskNoise - 0.5) * 7;
-      const hotspotLift = layerMode === "population" ? Math.min(16, Math.pow(influence.coverage, 1.08) * 15) : Math.min(24, Math.pow(influence.coverage, 1.18) * 22);
-      const value = clamp(influence.value + hotspotLift + texture, 2, 100);
-      const west = round(longitude, 3);
-      const east = round(Math.min(longitude + cellSize, bounds[2]), 3);
-      const south = round(latitude, 3);
-      const north = round(Math.min(latitude + cellSize, bounds[3]), 3);
-
-      features.push({
-        type: "Feature",
-        properties: {
-          city: influence.city,
-          country: influence.country,
-          npwei: influence.npwei,
-          population: influence.population,
-          value
-        },
-        geometry: {
-          type: "Polygon",
-          coordinates: [
-            [
-              [west, south],
-              [east, south],
-              [east, north],
-              [west, north],
-              [west, south]
-            ]
-          ]
-        }
-      });
-    }
-  }
-
-  return {
-    type: "FeatureCollection",
-    features
-  };
-}
-
-function getSparseNo2PixelSurface(rows: CityNpweiRow[], season: WebDataSeason, year: number, month: number): PixelFeatureCollection {
-  const features: PixelFeature[] = [];
-  const selectedCity = rows.length === 1;
-  const cellSize = 0.12;
-  const selectedMonthBoost = getMonthBoost(month);
-  const selectedSeasonBoost = season === "DJF" ? 1.08 : season === "JJA" ? 0.94 : 1;
-  const yearBoost = 0.96 + Math.max(0, Math.min(4, year - 2020)) * 0.01;
-  const valueBoost = selectedMonthBoost * selectedSeasonBoost * yearBoost;
-  const maxUrbanPop = Math.max(1, ...rows.map((city) => city.urbanPop));
-  const sources = getNo2PixelSources(rows, valueBoost, maxUrbanPop);
-  const bounds = selectedCity ? getNo2CityBounds(rows[0]) : getNo2RasterBounds(sources);
-
-  for (let longitude = snapToGrid(bounds[0], cellSize); longitude <= bounds[2]; longitude += cellSize) {
-    for (let latitude = snapToGrid(bounds[1], cellSize); latitude <= bounds[3]; latitude += cellSize) {
-      const centroid: [number, number] = [round(longitude + cellSize / 2, 3), round(latitude + cellSize / 2, 3)];
-      if (!pointInGeoJsonFeatureCollection(centroid, abnMapBoundary as any)) continue;
-
-      const influence = interpolateExposureCell(centroid, sources, season);
-      if (!influence) continue;
-
-      const seed = hashString(`${round(longitude, 2)}:${round(latitude, 2)}:${influence.city}:${season}:${year}:${month}`);
-      if (!shouldKeepExposurePixel(influence, centroid, seed, selectedCity)) continue;
-
-      const textureNoise = deterministicNoise(seed, 2, 23);
-      const edgeNoise = deterministicNoise(seed, 5, 47);
-      const column = clamp(influence.column + (textureNoise - 0.5) * 0.74 + influence.coverage * 0.44, 0.1, 10.4);
-      const texture = (textureNoise - 0.5) * 11 + (edgeNoise - 0.5) * 5;
-      const value = clamp(influence.value + Math.pow(influence.coverage, 0.86) * 18 + texture, 2, 100);
-      const westCell = round(longitude, 3);
-      const eastCell = round(longitude + cellSize, 3);
-      const southCell = round(latitude, 3);
-      const northCell = round(latitude + cellSize, 3);
-
-      features.push({
-        type: "Feature",
-        properties: {
-          city: influence.city,
-          column,
-          country: influence.country,
-          npwei: influence.npwei,
-          population: influence.population,
-          value
-        },
-        geometry: {
-          type: "Polygon",
-          coordinates: [
-            [
-              [westCell, southCell],
-              [eastCell, southCell],
-              [eastCell, northCell],
-              [westCell, northCell],
-              [westCell, southCell]
-            ]
-          ]
-        }
-      });
-    }
-  }
-
-  return {
-    type: "FeatureCollection",
-    features
-  };
-}
-
-function getNo2PixelSources(rows: CityNpweiRow[], valueBoost: number, maxUrbanPop: number) {
-  const rowSources = rows.map((city) => getPixelSource(city, valueBoost, maxUrbanPop, "no2"));
-  if (rows.length === 1) return rowSources;
-
-  const rowCountries = new Set(rows.map((row) => row.country));
-  const isRegionalView = rows.length >= 12;
-  const supplementalSources = SUPPLEMENTAL_EXPOSURE_SOURCES
-    .filter((source) => isRegionalView || rowCountries.has(source.country))
-    .map((source) => ({
-      country: source.country,
-      lat: source.lat,
-      lon: source.lon,
-      name: source.name,
-      npwei: source.npwei,
-      population: source.population,
-      populationWeight: Math.sqrt(source.population),
-      radius: source.radius,
-      value: clamp(source.npwei * valueBoost, 1, 100)
-    }));
-
-  return rowSources.concat(supplementalSources);
-}
-
-function getPixelSource(city: CityNpweiRow, valueBoost: number, maxUrbanPop: number, layerMode: TargetMapLayerMode): PixelSource {
-  const populationWeight = Math.sqrt(Math.max(0.1, city.urbanPop));
-  const populationValue = Math.round((city.urbanPop / maxUrbanPop) * 100);
-  const no2Radius = clamp(0.48 + populationWeight * 0.24 + city.npwei * 0.006, 0.74, 2.35);
-  const populationRadius = 0.72 + populationWeight * 0.32 + populationValue * 0.006;
-
-  return {
-    country: city.country,
-    lat: city.lat,
-    lon: city.lon,
-    name: city.name,
-    npwei: city.npwei,
-    population: city.urbanPop,
-    populationWeight,
-    radius: layerMode === "population" ? populationRadius : no2Radius,
-    value: clamp(layerMode === "population" ? populationValue : city.npwei * valueBoost, 1, 100)
-  };
-}
-
-function interpolateExposureCell(point: [number, number], sources: PixelSource[], season: WebDataSeason) {
-  let coverage = 0;
-  let weightedValue = 0;
-  let weightedColumn = 0;
-  let strongest = 0;
-  let nearest = sources[0];
-  const latitudeScale = Math.max(0.72, Math.cos((point[1] * Math.PI) / 180));
-
-  for (const source of sources) {
-    const dx = (point[0] - source.lon) * latitudeScale;
-    const dy = (point[1] - source.lat) * 1.12;
-    const angle = getPlumeAngle(source, season);
-    const along = dx * Math.cos(angle) + dy * Math.sin(angle);
-    const cross = -dx * Math.sin(angle) + dy * Math.cos(angle);
-    const alongRadius = source.radius * (season === "DJF" ? 1.64 : season === "JJA" ? 1.42 : 1.5);
-    const crossRadius = source.radius * (season === "JJA" ? 0.98 : 0.88);
-    const normalizedDistance = Math.sqrt((along / alongRadius) ** 2 + (cross / crossRadius) ** 2);
-
-    if (normalizedDistance > 2.02) continue;
-
-    const decay = Math.exp(-normalizedDistance * normalizedDistance * 0.92);
-    const weight = decay * source.populationWeight * (0.54 + source.value / 150);
-    coverage += weight;
-    weightedValue += source.value * weight;
-    weightedColumn += (source.value / 11.5) * weight;
-
-    if (weight > strongest) {
-      strongest = weight;
-      nearest = source;
-    }
-  }
-
-  if (!nearest || coverage <= 0) return null;
-
-  return {
-    city: nearest.name,
-    column: weightedColumn / coverage,
-    country: nearest.country,
-    coverage: Math.min(1.9, coverage / 4.4),
-    npwei: nearest.npwei,
-    population: nearest.population,
-    value: weightedValue / coverage
-  };
-}
-
-function shouldKeepExposurePixel(
-  influence: NonNullable<ReturnType<typeof interpolateExposureCell>>,
-  point: [number, number],
-  seed: number,
-  selectedCity: boolean
+  filterActive: boolean
 ) {
-  const maskNoise = deterministicNoise(seed, 1, 17);
-  const holeNoise = deterministicNoise(seed, 3, 41);
-  const edgeNoise = deterministicNoise(seed, 6, 59);
-  const patchNoise =
-    Math.sin(point[0] * 2.9 + point[1] * 1.7) * 0.5 +
-    Math.cos(point[0] * 1.6 - point[1] * 2.35) * 0.34 +
-    Math.sin(point[0] * 6.1 + point[1] * 3.2) * 0.16;
-  const baseThreshold = selectedCity ? 0.08 : 0.13;
-  const threshold = baseThreshold + maskNoise * 0.33 - Math.max(0, patchNoise) * 0.08;
+  if (!filterActive) return true;
+  if (rows.length === 0) return false;
 
-  if (influence.coverage < threshold && influence.value < 70) return false;
-  if (influence.coverage < 0.3 && edgeNoise < 0.55) return false;
-  if (influence.coverage < 0.58 && patchNoise < -0.2) return false;
-  if (influence.coverage < 0.86 && holeNoise < 0.14) return false;
+  const country = typeof properties.country === "string" ? properties.country : "";
+  const city = typeof properties.city === "string" ? properties.city : "";
+  if (country && city) return visibleFeatureKeys.has(featureKey(country, city));
+  if (country) return rows.some((row) => countryKey(row.country) === countryKey(country));
 
-  return true;
+  return isGridFeatureNearRows(properties, rows);
 }
 
-function getPlumeAngle(source: PixelSource, season: WebDataSeason) {
-  const seed = hashString(`${source.name}:${source.country}:${season}`);
-  const base = deterministicNoise(seed, 7, 71) * Math.PI;
-  const seasonalTurn = season === "DJF" ? -0.36 : season === "JJA" ? 0.28 : 0;
-  return base + seasonalTurn;
+function featureKey(country: string, city: string) {
+  return `${country.trim().toLowerCase()}::${city.trim().toLowerCase()}`;
 }
 
-function getCityBounds(city: CityNpweiRow): [number, number, number, number] {
-  const padding = 1.9 + Math.sqrt(Math.max(0.1, city.urbanPop)) * 0.28;
-  return [city.lon - padding, city.lat - padding * 0.72, city.lon + padding, city.lat + padding * 0.72];
+function countryKey(country: string) {
+  return country.trim().toLowerCase();
 }
 
-function getNo2CityBounds(city: CityNpweiRow): [number, number, number, number] {
-  const padding = 1.55 + Math.sqrt(Math.max(0.1, city.urbanPop)) * 0.34;
-  return [city.lon - padding, city.lat - padding * 0.78, city.lon + padding, city.lat + padding * 0.78];
+function isGridFeatureNearRows(properties: Partial<No2TileProperties> | Record<string, unknown>, rows: CityNpweiRow[]) {
+  const lon = Number(properties.lon);
+  const lat = Number(properties.lat);
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return false;
+
+  return rows.some((row) => getDistanceFromCityDegrees(lon, lat, row) <= getFilteredGridRadius(row));
 }
 
-function getNo2RasterBounds(sources: PixelSource[]): [number, number, number, number] {
-  const longitudes = sources.map((source) => source.lon);
-  const latitudes = sources.map((source) => source.lat);
-  const west = Math.max(-18.2, Math.min(...longitudes) - 2.35);
-  const east = Math.min(15.2, Math.max(...longitudes) + 1.8);
-  const south = Math.max(4.0, Math.min(...latitudes) - 1.85);
-  const north = Math.min(15.7, Math.max(...latitudes) + 1.65);
-
-  return [west, south, east, north];
+function getDistanceFromCityDegrees(lon: number, lat: number, row: CityNpweiRow) {
+  const latitudeScale = Math.max(0.25, Math.cos((((lat + row.lat) / 2) * Math.PI) / 180));
+  const dx = (lon - row.lon) * latitudeScale;
+  const dy = lat - row.lat;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
-function interpolateNpweiCell(point: [number, number], sources: PixelSource[]) {
-  let coverage = 0;
-  let weightedValue = 0;
-  let strongest = 0;
-  let nearest = sources[0];
-  const latitudeScale = Math.max(0.74, Math.cos((point[1] * Math.PI) / 180));
+function getFilteredGridRadius(row: CityNpweiRow) {
+  const scaledRadius = 0.58 + Math.sqrt(Math.max(0.1, row.urbanPop)) * 0.14;
+  return Math.min(FILTERED_GRID_MAX_RADIUS_DEGREES, Math.max(FILTERED_GRID_MIN_RADIUS_DEGREES, scaledRadius));
+}
 
-  for (const source of sources) {
-    const dx = (point[0] - source.lon) * latitudeScale;
-    const dy = (point[1] - source.lat) * 1.18;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    if (distance > source.radius * 2.45) continue;
-
-    const decay = Math.exp(-(distance * distance) / (2 * source.radius * source.radius));
-    const weight = decay * source.populationWeight * (0.62 + source.value / 125);
-    coverage += weight;
-    weightedValue += source.value * weight;
-
-    if (weight > strongest) {
-      strongest = weight;
-      nearest = source;
-    }
+function getFeatureFillColor(
+  properties: No2TileProperties,
+  layerMode: TargetMapLayerMode,
+  visibleFeatureKeys: Set<string>,
+  rows: CityNpweiRow[],
+  filterActive: boolean,
+  log10ExposureRange: NumericRange,
+  populationRange: NumericRange
+) {
+  if (!isInsideWestAfricaBoundary(properties)) return [0, 0, 0, 0] as [number, number, number, number];
+  if (!isVisibleFeature(properties, visibleFeatureKeys, rows, filterActive)) return [0, 0, 0, 0] as [number, number, number, number];
+  if (layerMode === "population") {
+    if (!isPopulationFeature(properties)) return [0, 0, 0, 0] as [number, number, number, number];
+    return getPopulationColor(Number(properties.population_count ?? 0), populationRange, 218);
   }
+  if (!isAffectedPweFeature(properties)) return [0, 0, 0, 0] as [number, number, number, number];
+  return getLogExposureColor(Number(properties.log10_pixel_exposure ?? 0), log10ExposureRange, 226);
+}
 
-  if (!nearest || coverage <= 0) return null;
+function isAffectedPweFeature(properties: Partial<No2TileProperties> | Record<string, unknown>) {
+  const density = Number(properties.density_people_per_km2 ?? 0);
+  const logExposure = Number(properties.log10_pixel_exposure ?? 0);
+  const population = Number(properties.population_count ?? 0);
 
-  return {
-    city: nearest.name,
-    country: nearest.country,
-    coverage: Math.min(1.8, coverage / 4.2),
-    npwei: nearest.npwei,
-    population: nearest.population,
-    value: weightedValue / coverage
-  };
+  return (
+    Number.isFinite(density) &&
+    Number.isFinite(logExposure) &&
+    Number.isFinite(population) &&
+    density >= AFFECTED_PWE_DENSITY_THRESHOLD &&
+    logExposure > 0 &&
+    population > 0
+  );
+}
+
+function isPopulationFeature(properties: Partial<No2TileProperties> | Record<string, unknown>) {
+  const density = Number(properties.density_people_per_km2 ?? 0);
+  const population = Number(properties.population_count ?? 0);
+
+  return (
+    Number.isFinite(density) &&
+    Number.isFinite(population) &&
+    density >= AFFECTED_PWE_DENSITY_THRESHOLD &&
+    population > 0
+  );
+}
+
+function isInsideWestAfricaBoundary(properties: Partial<No2TileProperties> | Record<string, unknown>) {
+  const lon = Number(properties.lon);
+  const lat = Number(properties.lat);
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return false;
+
+  return pointInGeoJsonFeatureCollection([lon, lat], westAfricaBoundary as any);
 }
 
 function pointInGeoJsonFeatureCollection(point: [number, number], collection: any) {
@@ -566,7 +494,10 @@ function pointInGeoJsonFeatureCollection(point: [number, number], collection: an
       const geometry = feature.geometry;
       if (!geometry) return false;
 
-      if (geometry.type === "Polygon") return pointInPolygonWithHoles(point, geometry.coordinates);
+      if (geometry.type === "Polygon") {
+        return pointInPolygonWithHoles(point, geometry.coordinates);
+      }
+
       if (geometry.type === "MultiPolygon") {
         return geometry.coordinates.some((polygon: [number, number][][]) => pointInPolygonWithHoles(point, polygon));
       }
@@ -585,12 +516,15 @@ function pointInPolygon(point: [number, number], polygon: [number, number][]) {
   const [longitude, latitude] = point;
   let inside = false;
 
-  for (let index = 0, previousIndex = polygon.length - 1; index < polygon.length; previousIndex = index, index += 1) {
-    const [longitudeA, latitudeA] = polygon[index];
-    const [longitudeB, latitudeB] = polygon[previousIndex];
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
+    const [currentLongitude, currentLatitude] = polygon[index];
+    const [previousLongitude, previousLatitude] = polygon[previous];
     const intersects =
-      latitudeA > latitude !== latitudeB > latitude &&
-      longitude < ((longitudeB - longitudeA) * (latitude - latitudeA)) / (latitudeB - latitudeA) + longitudeA;
+      currentLatitude > latitude !== previousLatitude > latitude &&
+      longitude <
+        ((previousLongitude - currentLongitude) * (latitude - currentLatitude)) /
+          (previousLatitude - currentLatitude) +
+          currentLongitude;
 
     if (intersects) inside = !inside;
   }
@@ -598,57 +532,58 @@ function pointInPolygon(point: [number, number], polygon: [number, number][]) {
   return inside;
 }
 
-function getMonthBoost(month: number) {
-  if (month <= 2 || month >= 11) return 1.08;
-  if (month >= 6 && month <= 9) return 0.93;
-  return 1;
+function getTooltipText(properties: No2TileProperties, metadata: No2MapDisplayMetadata) {
+  const city = properties.city ? `${properties.city}, ` : "";
+  const country = properties.country ?? "West Africa grid cell";
+  const season = properties.season ?? "Unknown season";
+  const year = properties.year ?? "Unknown year";
+
+  return [
+    `${city}${country}`,
+    `NO2 column ${formatScientific(Number(properties.no2_column_molec_cm2 ?? 0), metadata.units.no2Column)}`,
+    `Population ${formatWholeNumber(Number(properties.population_count ?? 0))}`,
+    `Pixel exposure ${formatScientific(Number(properties.pixel_exposure ?? 0), metadata.units.pixelExposure)}`,
+    `log10(pixel_exposure) ${formatNumber(Number(properties.log10_pixel_exposure ?? 0), 2)}`,
+    `${season} ${year}`
+  ].join("\n");
 }
 
-function getNpweiColor(value: number, alpha: number): [number, number, number, number] {
+function getLogExposureColor(value: number, range: NumericRange, alpha: number): [number, number, number, number] {
   const stops: Array<[number, [number, number, number]]> = [
-    [0, [82, 0, 168]],
-    [25, [125, 30, 183]],
-    [45, [191, 41, 151]],
-    [62, [238, 95, 93]],
-    [78, [249, 163, 41]],
-    [100, [242, 229, 29]]
+    [0, [5, 5, 8]],
+    [0.16, [45, 0, 84]],
+    [0.34, [96, 21, 126]],
+    [0.52, [167, 47, 122]],
+    [0.7, [226, 80, 84]],
+    [0.86, [250, 151, 42]],
+    [1, [252, 231, 37]]
   ];
-  const clamped = clamp(value, 0, 100);
-
-  for (let index = 0; index < stops.length - 1; index += 1) {
-    const [fromValue, fromColor] = stops[index];
-    const [toValue, toColor] = stops[index + 1];
-    if (clamped >= fromValue && clamped <= toValue) {
-      const ratio = (clamped - fromValue) / (toValue - fromValue);
-      return [
-        Math.round(fromColor[0] + (toColor[0] - fromColor[0]) * ratio),
-        Math.round(fromColor[1] + (toColor[1] - fromColor[1]) * ratio),
-        Math.round(fromColor[2] + (toColor[2] - fromColor[2]) * ratio),
-        alpha
-      ];
-    }
-  }
-
-  const lastColor = stops[stops.length - 1][1];
-  return [lastColor[0], lastColor[1], lastColor[2], alpha];
+  return interpolateStops(normalizeToUnit(value, range), stops, alpha);
 }
 
-function getPopulationColor(value: number, alpha: number): [number, number, number, number] {
+function getPopulationColor(value: number, range: NumericRange, alpha: number): [number, number, number, number] {
   const stops: Array<[number, [number, number, number]]> = [
     [0, [224, 247, 250]],
-    [18, [139, 213, 210]],
-    [38, [48, 174, 183]],
-    [62, [22, 116, 166]],
-    [82, [30, 70, 148]],
-    [100, [40, 31, 132]]
+    [0.18, [139, 213, 210]],
+    [0.38, [48, 174, 183]],
+    [0.62, [22, 116, 166]],
+    [0.82, [30, 70, 148]],
+    [1, [40, 31, 132]]
   ];
-  const clamped = clamp(value, 0, 100);
+  return interpolateStops(normalizeToUnit(value, range), stops, alpha);
+}
 
+function interpolateStops(
+  value: number,
+  stops: Array<[number, [number, number, number]]>,
+  alpha: number
+): [number, number, number, number] {
+  const clamped = Math.min(1, Math.max(0, value));
   for (let index = 0; index < stops.length - 1; index += 1) {
     const [fromValue, fromColor] = stops[index];
     const [toValue, toColor] = stops[index + 1];
     if (clamped >= fromValue && clamped <= toValue) {
-      const ratio = (clamped - fromValue) / (toValue - fromValue);
+      const ratio = (clamped - fromValue) / Math.max(0.000001, toValue - fromValue);
       return [
         Math.round(fromColor[0] + (toColor[0] - fromColor[0]) * ratio),
         Math.round(fromColor[1] + (toColor[1] - fromColor[1]) * ratio),
@@ -662,28 +597,76 @@ function getPopulationColor(value: number, alpha: number): [number, number, numb
   return [lastColor[0], lastColor[1], lastColor[2], alpha];
 }
 
-function deterministicNoise(seed: number, index: number, salt: number) {
-  const value = Math.sin(seed * 12.9898 + index * 78.233 + salt * 37.719) * 43758.5453;
-  return value - Math.floor(value);
+function normalizeToUnit(value: number, range: NumericRange) {
+  const span = range.max - range.min;
+  if (!Number.isFinite(value) || span <= 0) return 0;
+  return (value - range.min) / span;
 }
 
-function hashString(value: string) {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash << 5) - hash + value.charCodeAt(index);
-    hash |= 0;
-  }
-  return Math.abs(hash) + 1;
+function getClippedNumericRange(
+  data: No2MapGridFeatureCollection,
+  propertyName: keyof No2TileProperties,
+  lowerPercentile: number,
+  upperPercentile: number,
+  includeFeature: (properties: Record<string, unknown>) => boolean = () => true
+): NumericRange | null {
+  const values = data.features
+    .map((feature) => {
+      if (!includeFeature(feature.properties ?? {})) return null;
+      const value = feature.properties?.[propertyName];
+      return typeof value === "number" && Number.isFinite(value) ? value : null;
+    })
+    .filter((value): value is number => value !== null)
+    .sort((a, b) => a - b);
+
+  if (values.length < 2) return null;
+
+  const min = getQuantile(values, lowerPercentile);
+  const max = getQuantile(values, upperPercentile);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null;
+
+  return { min, max };
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
+function getQuantile(sortedValues: number[], percentile: number) {
+  const clampedPercentile = Math.min(1, Math.max(0, percentile));
+  const position = (sortedValues.length - 1) * clampedPercentile;
+  const lowerIndex = Math.floor(position);
+  const upperIndex = Math.ceil(position);
+  const lowerValue = sortedValues[lowerIndex] ?? sortedValues[0];
+  const upperValue = sortedValues[upperIndex] ?? sortedValues[sortedValues.length - 1];
+  const ratio = position - lowerIndex;
+
+  return lowerValue + (upperValue - lowerValue) * ratio;
 }
 
-function round(value: number, digits = 3) {
-  return Number(value.toFixed(digits));
+function formatLegendValue(value: number, layerMode: TargetMapLayerMode) {
+  if (layerMode === "population") return formatCompactNumber(value);
+  return formatNumber(value, 1);
 }
 
-function snapToGrid(value: number, cellSize: number) {
-  return round(Math.floor(value / cellSize) * cellSize, 3);
+function formatScientific(value: number, units: string) {
+  const displayUnits = formatDisplayUnits(units);
+  if (!Number.isFinite(value) || value <= 0) return `No data ${displayUnits}`;
+  const [mantissa, exponent] = value.toExponential(2).split("e");
+  return `${mantissa} x 10^${Number(exponent)} ${displayUnits}`;
+}
+
+function formatDisplayUnits(units: string) {
+  return units.replaceAll("cm-2", "cm^-2");
+}
+
+function formatWholeNumber(value: number) {
+  if (!Number.isFinite(value)) return "No data";
+  return Math.round(value).toLocaleString();
+}
+
+function formatCompactNumber(value: number) {
+  if (!Number.isFinite(value)) return "No data";
+  return Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
+function formatNumber(value: number, digits: number) {
+  if (!Number.isFinite(value)) return "No data";
+  return value.toFixed(digits);
 }

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   buildNo2GridDataUrl,
@@ -310,6 +312,82 @@ describe("backend web_data client", () => {
     expect(metadataAttempts).toBe(2);
   });
 
+  it("keeps the map implementation on backend grid or MVT sources instead of synthetic sample surfaces", () => {
+    const source = readFileSync(join(process.cwd(), "src", "components", "TargetNpweiMap.tsx"), "utf-8");
+    const mapExplorerSource = readFileSync(join(process.cwd(), "src", "components", "MapExplorer.tsx"), "utf-8");
+    const webDataClientSource = readFileSync(join(process.cwd(), "src", "data", "webDataClient.ts"), "utf-8");
+    const skeletonSource = readFileSync(join(process.cwd(), "src", "components", "Skeletons.tsx"), "utf-8");
+    const legacyMapSource = readFileSync(join(process.cwd(), "src", "components", "ExposureMap.tsx"), "utf-8");
+
+    expect(source).toContain("MVTLayer");
+    expect(source).toContain("GeoJsonLayer");
+    expect(source).toContain("loadNo2MapData(fetch, apiBaseUrl, season, year)");
+    expect(webDataClientSource).toContain("fetchNo2MapTileMetadata");
+    expect(webDataClientSource).toContain("fetchNo2MapGridMetadata");
+    expect(webDataClientSource).toContain("fetchNo2MapGridData");
+    expect(webDataClientSource).toContain("DEFAULT_NO2_MAP_DATA_RETRIES = 2");
+    expect(webDataClientSource).toContain("NO2_MAP_TILE_PREFLIGHT_LIMIT");
+    expect(source).toContain("getNo2MapSeasonYearRanges(metadata, season, year)");
+    expect(source).toContain("log10(pixel_exposure)");
+    expect(source).toContain("PWE = NO2 x Population, Log Scale");
+    expect(source).toContain('"background-color": "#ffffff"');
+    expect(source).not.toContain("local-country-context-fill");
+    expect(source).not.toContain("local-country-labels");
+    expect(source).not.toContain("COUNTRY_LABELS");
+    expect(source).not.toContain("[238, 247, 242");
+    expect(source).not.toContain("Fallback");
+    expect(source).not.toContain("ScatterplotLayer");
+    expect(source).not.toContain("getSparseNo2PixelSurface");
+    expect(source).not.toContain("interpolateExposureCell");
+    expect(source).not.toContain("SUPPLEMENTAL_EXPOSURE_SOURCES");
+    expect(source).not.toContain("@/data/sampleData");
+    expect(source).toContain("basemaps.cartocdn.com");
+    expect(mapExplorerSource).toContain('import { TargetNpweiMap } from "@/components/TargetNpweiMap";');
+    expect(mapExplorerSource).toContain("<TargetNpweiMap");
+    expect(mapExplorerSource).not.toContain("window.location.reload");
+    expect(mapExplorerSource).not.toContain("sessionStorage");
+    expect(mapExplorerSource).not.toContain("next/dynamic");
+    expect(mapExplorerSource).not.toContain("dynamic<DeferredTargetMapProps>");
+    expect(mapExplorerSource).not.toContain("TARGET_MAP_CHUNK_RELOAD_KEY");
+    expect(skeletonSource).toContain("skeleton-map-panel");
+    expect(skeletonSource).toContain("skeleton-map-zoom");
+    expect(skeletonSource).toContain("skeleton-map-layers");
+    expect(skeletonSource).toContain("skeleton-map-legend");
+    expect(skeletonSource).not.toContain("skeleton-map-land");
+    expect(mapExplorerSource).not.toContain("@/data/sampleData");
+    expect(legacyMapSource).toContain("basemaps.cartocdn.com");
+    expect(legacyMapSource).not.toContain("country-labels");
+    expect(legacyMapSource).not.toContain("COUNTRY_LABELS");
+  });
+
+  it("enables SDF font rendering for remaining outlined map text labels", () => {
+    const files = ["ExposureMap.tsx"];
+
+    files.forEach((file) => {
+      const source = readFileSync(join(process.cwd(), "src", "components", file), "utf-8");
+      const outlinedTextLayers = extractTextLayerProps(source).filter((props) => props.includes("outlineWidth"));
+
+      expect(outlinedTextLayers.length).toBeGreaterThan(0);
+      outlinedTextLayers.forEach((props) => {
+        expect(props).toContain("fontSettings: { sdf: true }");
+      });
+    });
+  });
+
+  it("keeps overview production metrics on generated web_data selectors", () => {
+    const dashboardSource = readFileSync(join(process.cwd(), "src", "components", "DashboardView.tsx"), "utf-8");
+    const rankingSource = readFileSync(join(process.cwd(), "src", "components", "OverviewRankingTable.tsx"), "utf-8");
+    const homeSource = readFileSync(join(process.cwd(), "src", "app", "page.tsx"), "utf-8");
+
+    expect(dashboardSource).toContain("getOverviewSummaryMetrics");
+    expect(dashboardSource).toContain("TargetNpweiMap");
+    expect(rankingSource).toContain("getOverviewCountryRanking");
+    expect(homeSource).toContain("getOverviewHotspots");
+    expect(dashboardSource).not.toContain("@/data/sampleData");
+    expect(rankingSource).not.toContain("@/data/sampleData");
+    expect(homeSource).not.toContain("@/data/sampleData");
+  });
+
 });
 
 function cloneLocalSnapshot(): WebDataSnapshot {
@@ -404,4 +482,33 @@ function sampleGridFeatureCollection() {
     type: "FeatureCollection",
     features: [{ type: "Feature", properties: { log10_pixel_exposure: 19 }, geometry: null }]
   };
+}
+
+function extractTextLayerProps(source: string): string[] {
+  const blocks: string[] = [];
+  const marker = "new TextLayer";
+  let markerIndex = source.indexOf(marker);
+
+  while (markerIndex !== -1) {
+    const openBraceIndex = source.indexOf("{", markerIndex);
+    if (openBraceIndex === -1) break;
+
+    let depth = 0;
+    let blockEndIndex = -1;
+    for (let index = openBraceIndex; index < source.length; index += 1) {
+      const character = source[index];
+      if (character === "{") depth += 1;
+      if (character === "}") depth -= 1;
+      if (depth === 0) {
+        blockEndIndex = index;
+        break;
+      }
+    }
+
+    if (blockEndIndex === -1) break;
+    blocks.push(source.slice(openBraceIndex, blockEndIndex + 1));
+    markerIndex = source.indexOf(marker, blockEndIndex + 1);
+  }
+
+  return blocks;
 }

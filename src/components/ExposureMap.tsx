@@ -145,31 +145,6 @@ const NO2_SURFACE_CACHE = new Map<
 const NO2_RASTER_CACHE = new Map<string, No2Raster>();
 const MAX_NO2_CACHE_ENTRIES = 12;
 
-type MapRegionLabel = {
-  id: string;
-  name: string;
-  coordinates: [number, number];
-};
-
-const COUNTRY_LABELS: MapRegionLabel[] = [
-  { id: "mauritania", name: "Mauritania", coordinates: [-10.5, 20.5] },
-  { id: "mali", name: "Mali", coordinates: [-3.8, 20.4] },
-  { id: "niger", name: "Niger", coordinates: [8.7, 18.4] },
-  { id: "chad", name: "Chad", coordinates: [15.0, 15.0] },
-  { id: "senegal", name: "Senegal", coordinates: [-14.4, 14.5] },
-  { id: "gambia", name: "The Gambia", coordinates: [-15.45, 13.45] },
-  { id: "guinea-bissau", name: "Guinea-Bissau", coordinates: [-14.65, 11.75] },
-  { id: "guinea", name: "Guinea", coordinates: [-10.55, 10.35] },
-  { id: "sierra-leone", name: "Sierra Leone", coordinates: [-11.75, 8.45] },
-  { id: "liberia", name: "Liberia", coordinates: [-9.45, 6.45] },
-  { id: "cote-divoire", name: "Cote d'Ivoire", coordinates: [-5.35, 7.55] },
-  { id: "ghana", name: "Ghana", coordinates: [-1.05, 7.9] },
-  { id: "togo", name: "Togo", coordinates: [0.9, 8.55] },
-  { id: "benin", name: "Benin", coordinates: [2.4, 9.4] },
-  { id: "burkina-faso", name: "Burkina Faso", coordinates: [-1.55, 12.55] },
-  { id: "nigeria", name: "Nigeria", coordinates: [8.0, 9.35] },
-];
-
 export type ExposureMapProps = {
   filters: Filters;
   activeLayers: Record<LayerKey, boolean>;
@@ -216,7 +191,6 @@ export function ExposureMap({
   const labelCities = compact
     ? cities.filter((city) => OVERVIEW_CITY_LABELS.has(city.id))
     : cities;
-  const countryLabels = filters.countryId === "all" ? COUNTRY_LABELS : [];
   const initialViewState =
     compact && activeLayers.no2
       ? isMobileViewport
@@ -436,22 +410,6 @@ export function ExposureMap({
             Math.max(50000, hotspot.populationExposure * 1150),
           getLineColor: [194, 255, 117, 190],
           getFillColor: [94, 233, 181, 95],
-        })
-      : null,
-    showLabels && countryLabels.length > 0
-      ? new TextLayer<MapRegionLabel>({
-          id: "country-labels",
-          data: countryLabels,
-          getPosition: (label) => label.coordinates,
-          getText: (label) => label.name,
-          getSize: compact ? 13 : 12,
-          getColor: [10, 30, 42, 235],
-          getTextAnchor: "middle",
-          getAlignmentBaseline: "center",
-          outlineWidth: compact ? 2.4 : 2,
-          outlineColor: [255, 255, 255, 210],
-          fontWeight: 700,
-          pickable: false,
         })
       : null,
     showLabels

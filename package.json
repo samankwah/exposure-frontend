@@ -4,16 +4,19 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:clean": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Remove-Item -LiteralPath .next -Recurse -Force -ErrorAction SilentlyContinue\" && next dev",
     "build": "next build",
     "build:africa-contour": "node scripts/convert-shp-to-geojson.mjs data/shapefiles/africa-contour-map/africa-contour-map.shp src/data/africaContourMap.json africa-contour",
+    "build:west-africa-boundary": "node scripts/build-west-africa-boundary.mjs",
     "start": "next start",
     "test": "vitest run",
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
-    "@deck.gl/core": "^9.1.0",
-    "@deck.gl/layers": "^9.1.0",
-    "@deck.gl/react": "^9.1.0",
+    "@deck.gl/core": "^9.3.5",
+    "@deck.gl/geo-layers": "^9.3.5",
+    "@deck.gl/layers": "^9.3.5",
+    "@deck.gl/react": "^9.3.5",
     "chart.js": "^4.4.0",
     "highcharts": "^12.6.0",
     "highcharts-react-official": "^3.2.3",
@@ -33,7 +36,7 @@
     "eslint": "^9.16.0",
     "eslint-config-next": "15.5.18",
     "typescript": "^5.7.2",
-    "vitest": "^3.0.0"
+    "vitest": "^3.2.6"
   },
   "overrides": {
     "postcss": "8.5.15"

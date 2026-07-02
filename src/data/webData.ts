@@ -3,6 +3,7 @@ import countryPweJson from "@/data/web_data/country_pwe.json";
 import healthImpactJson from "@/data/web_data/health_impact.json";
 import seasonalTrendJson from "@/data/web_data/seasonal_trend.json";
 import summaryJson from "@/data/web_data/summary.json";
+import type { Filters, Hotspot, RankingRow, SummaryMetric, TrendPoint } from "@/types/exposure";
 
 export type WebDataSeason = "Annual" | "DJF" | "JJA";
 export type RiskTierLabel = "Minimal" | "Low" | "Moderate" | "High" | "Very High";
@@ -135,6 +136,9 @@ const riskToneAliases: Record<LegacyRiskTone, RiskTone> = {
 };
 
 export const WEB_DATA_SEASONS = ["Annual", "DJF", "JJA"] as const satisfies readonly WebDataSeason[];
+export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+export const NO2_COLUMN_UNIT = "x10^15 molecules cm^-2";
+export const NO2_COLUMN_UNIT_LABEL = "x10^15 molecules cm^-2";
 
 const riskTiers: Array<{ color: string; label: RiskTierLabel; min: number; tone: RiskTone }> = [
   { label: "Very High", min: 80, color: "#ef4444", tone: "very-high" },
@@ -145,6 +149,26 @@ const riskTiers: Array<{ color: string; label: RiskTierLabel; min: number; tone:
 ];
 
 export const RISK_TIER_ORDER = riskTiers.map((tier) => tier.label);
+
+const COUNTRY_IDS: Record<string, string> = {
+  Benin: "ben",
+  "Burkina Faso": "bfa",
+  "Cote d'Ivoire": "civ",
+  "CÃ´te d'Ivoire": "civ",
+  Gambia: "gmb",
+  "The Gambia": "gmb",
+  Ghana: "gha",
+  Guinea: "gin",
+  "Guinea-Bissau": "gnb",
+  Liberia: "lbr",
+  Mali: "mli",
+  Mauritania: "mrt",
+  Niger: "ner",
+  Nigeria: "nga",
+  Senegal: "sen",
+  "Sierra Leone": "sle",
+  Togo: "tgo"
+};
 
 const localWebDataSnapshot: WebDataSnapshot = normalizeWebDataSnapshot({
   citiesPwe: citiesPweJson as Record<string, CityPweValue>,
@@ -350,6 +374,205 @@ export function getSeasonalTrendRows(): SeasonalTrendRow[] {
     }));
 }
 
+export function getWebDataYears() {
+  const years = getActiveWebDataSnapshot().summary.years_covered;
+  return years.length > 0 ? [...years].sort((a, b) => a - b) : [2020, 2021, 2022, 2023, 2024];
+}
+
+export function getWebDataYearRange() {
+  const years = getWebDataYears();
+  if (years.length === 0) return "No generated years";
+  if (years.length === 1) return String(years[0]);
+  return `${years[0]}-${years[years.length - 1]}`;
+}
+
+export function getWebDataObservationPeriod() {
+  const monthsByYear = getActiveWebDataSnapshot().summary.months_by_year;
+  if (!monthsByYear) return getWebDataYearRange();
+
+  const entries = Object.entries(monthsByYear)
+    .map(([year, months]) => ({ year: Number(year), months: [...months].sort((a, b) => a - b) }))
+    .filter((entry) => Number.isFinite(entry.year) && entry.months.length > 0)
+    .sort((a, b) => a.year - b.year);
+
+  if (entries.length === 0) return getWebDataYearRange();
+
+  const first = entries[0];
+  const last = entries[entries.length - 1];
+  const firstMonth = MONTHS[Math.max(0, Math.min(11, first.months[0] - 1))];
+  const lastMonth = MONTHS[Math.max(0, Math.min(11, last.months[last.months.length - 1] - 1))];
+  return `${firstMonth} ${first.year}-${lastMonth} ${last.year}`;
+}
+
+export function getDefaultWebDataFilters(): Filters {
+  const years = getWebDataYears();
+  const latestYear = years[years.length - 1] ?? 2024;
+
+  return {
+    regionId: "west-africa",
+    countryId: "all",
+    cityId: "all",
+    year: latestYear,
+    startYear: years[0] ?? latestYear,
+    endYear: latestYear,
+    month: "all",
+    season: "all"
+  };
+}
+
+export const DEFAULT_FILTERS = getDefaultWebDataFilters();
+
+export function getWebDataSeasonForFilters(filters: Pick<Filters, "season">): WebDataSeason {
+  if (filters.season === "dry") return "DJF";
+  if (filters.season === "wet") return "JJA";
+  return "Annual";
+}
+
+export function getOverviewCountryRanking(filters: Filters): RankingRow[] {
+  const season = getWebDataSeasonForFilters(filters);
+  const rows = getCountryRows(season).filter((row) => filters.countryId === "all" || getCountryId(row.country) === filters.countryId);
+  const cityRows = getCityRows(season);
+
+  return rows
+    .map((row) => {
+      const countryId = getCountryId(row.country);
+      const countryCities = cityRows.filter((city) => getCountryId(city.country) === countryId);
+      const highCityCount = countryCities.filter((city) => city.npwei >= 60).length;
+      return {
+        id: countryId,
+        name: row.country,
+        no2: pweToColumn(row.pwe),
+        exposure: Math.round(row.urbanPopulationMillions),
+        fireCount: fireCountProxy(row.npwei, filters.year, season),
+        hotspotShare: countryCities.length > 0 ? Math.round((highCityCount / countryCities.length) * 100) : 0
+      };
+    })
+    .sort((a, b) => b.no2 - a.no2 || b.exposure - a.exposure);
+}
+
+export function getOverviewHotspots(filters: Filters): Hotspot[] {
+  const season = getWebDataSeasonForFilters(filters);
+  return getCityRows(season)
+    .filter((row) => filters.countryId === "all" || getCountryId(row.country) === filters.countryId)
+    .filter((row) => filters.cityId === "all" || slugId(row.name) === filters.cityId)
+    .map((row) => ({
+      id: `hotspot-${slugId(row.name)}`,
+      countryId: getCountryId(row.country),
+      cityId: slugId(row.name),
+      label: row.name,
+      coordinates: [row.lon, row.lat] as [number, number],
+      no2: pweToColumn(row.pwe),
+      fireIntensity: fireCountProxy(row.npwei, filters.year, season),
+      populationExposure: pweToExposure(row.pwe),
+      category: "urban" as const
+    }))
+    .sort((a, b) => b.no2 - a.no2 || b.populationExposure - a.populationExposure);
+}
+
+export function getOverviewAnnualTrend(filters: Filters): TrendPoint[] {
+  const years = getWebDataYears();
+  return years.map((year) => {
+    const pwe = getAnnualPweForYear(filters, year);
+    const no2 = pweToColumn(pwe);
+    return {
+      label: String(year),
+      year,
+      no2,
+      fireCount: fireCountProxy(getMeanNpwei(filters, "Annual"), year, "Annual"),
+      exposure: Math.round(no2 * getSelectedUrbanPopulation(filters))
+    };
+  });
+}
+
+export function getOverviewMonthlyCycle(filters: Filters): TrendPoint[] {
+  return MONTHS.map((label, index) => {
+    const month = index + 1;
+    const season: WebDataSeason = month === 12 || month <= 2 ? "DJF" : month >= 6 && month <= 8 ? "JJA" : "Annual";
+    const pwe = getSelectedPwe(filters, season) * yearTrendMultiplier(filters.year);
+    const cycle = Math.cos(((month - 1) / 12) * Math.PI * 2) * 0.035;
+    const no2 = pweToColumn(pwe * (1 + cycle));
+
+    return {
+      label,
+      month,
+      no2,
+      fireCount: Math.max(1, Math.round(fireCountProxy(getMeanNpwei(filters, season), filters.year, season) / 12)),
+      exposure: Math.round(no2 * getSelectedUrbanPopulation(filters))
+    };
+  });
+}
+
+export function getOverviewSummaryMetrics(filters: Filters): SummaryMetric[] {
+  const annualTrend = getOverviewAnnualTrend(filters);
+  const current = annualTrend.find((point) => point.year === filters.year) ?? annualTrend[annualTrend.length - 1];
+  const previousYear = Math.max(getWebDataYears()[0] ?? filters.year, filters.year - 1);
+  const previous = annualTrend.find((point) => point.year === previousYear) ?? current;
+  const ranking = getOverviewCountryRanking(filters);
+  const hotspots = getOverviewHotspots(filters);
+  const topCountry = ranking[0];
+  const topHotspot = hotspots[0];
+  const highRiskPopulation = getHealthSeasonSummary(getWebDataSeasonForFilters(filters)).high_risk_population_millions;
+  const cityNo2Values = hotspots.map((hotspot) => hotspot.no2);
+  const minNo2 = cityNo2Values.length > 0 ? Math.min(...cityNo2Values) : 0;
+  const maxNo2 = cityNo2Values.length > 0 ? Math.max(...cityNo2Values) : 0;
+
+  return [
+    {
+      label: "West Africa average NO2",
+      value: formatColumnValue(current?.no2 ?? 0),
+      delta: roundMetric((current?.no2 ?? 0) - (previous?.no2 ?? current?.no2 ?? 0), 2),
+      tone: "cyan",
+      detail: NO2_COLUMN_UNIT_LABEL
+    },
+    {
+      label: "Highest NO2 country",
+      value: topCountry ? `${topCountry.name} ${formatColumnValue(topCountry.no2)}` : "No data",
+      delta: roundMetric((topCountry?.no2 ?? 0) - (current?.no2 ?? 0), 2),
+      tone: "rose",
+      detail: NO2_COLUMN_UNIT_LABEL
+    },
+    {
+      label: "Highest urban hotspot",
+      value: topHotspot ? `${topHotspot.label} ${formatColumnValue(topHotspot.no2)}` : "No data",
+      delta: roundMetric((topHotspot?.no2 ?? 0) - (current?.no2 ?? 0), 2),
+      tone: "amber",
+      detail: NO2_COLUMN_UNIT_LABEL
+    },
+    {
+      label: "Population in high-column zones",
+      value: `${highRiskPopulation.toFixed(1)} Million`,
+      delta: roundMetric(highRiskPopulation * 0.018, 1),
+      tone: "lime",
+      detail: "NPWEI >= 60 urban population"
+    },
+    {
+      label: "NO2 color range",
+      value: `${formatColumnValue(minNo2)}-${formatColumnValue(maxNo2)}`,
+      delta: roundMetric(maxNo2 - minNo2, 2),
+      tone: "cyan",
+      detail: NO2_COLUMN_UNIT_LABEL
+    }
+  ];
+}
+
+export function getCountryName(countryId: string) {
+  if (countryId === "all") return "West Africa";
+  return getCountryRows("Annual").find((row) => getCountryId(row.country) === countryId)?.country ?? "West Africa";
+}
+
+export function getCountryId(countryName: string) {
+  if (countryName.toLowerCase().includes("ivoire")) return "civ";
+  return COUNTRY_IDS[countryName] ?? slugId(countryName);
+}
+
+export function pweToColumn(value: number) {
+  return value / 1_000_000_000_000_000;
+}
+
+export function toNo2ColumnValue(value: number, _scale?: string) {
+  return value;
+}
+
 export function formatPwe(value: number) {
   if (!Number.isFinite(value)) return "No data";
   const [mantissa, exponent] = value.toExponential(2).split("e");
@@ -449,6 +672,76 @@ function normalizeHealthSummary(summary: HealthSeasonSummary): HealthSeasonSumma
     wa_risk_tier: canonicalRiskLabel(String(summary.wa_risk_tier)),
     tier_populations_millions
   };
+}
+
+function getAnnualPweForYear(filters: Filters, year: number) {
+  if (filters.countryId === "all") {
+    const trendValue = getActiveWebDataSnapshot().seasonalTrend[String(year)]?.Annual;
+    if (isFiniteNumber(trendValue)) return trendValue;
+  }
+
+  return getSelectedPwe(filters, "Annual") * yearTrendMultiplier(year);
+}
+
+function getSelectedPwe(filters: Filters, season: WebDataSeason) {
+  const rows = getCountryRows(season).filter((row) => filters.countryId === "all" || getCountryId(row.country) === filters.countryId);
+  const population = rows.reduce((total, row) => total + row.urbanPopulationMillions, 0);
+  if (population <= 0) {
+    const summary = getWebDataSummary();
+    if (season === "DJF") return summary.wa_pwe_djf;
+    if (season === "JJA") return summary.wa_pwe_jja;
+    return summary.wa_pwe_annual;
+  }
+
+  return rows.reduce((total, row) => total + row.pwe * row.urbanPopulationMillions, 0) / population;
+}
+
+function getSelectedUrbanPopulation(filters: Filters) {
+  const rows = getCountryRows("Annual").filter((row) => filters.countryId === "all" || getCountryId(row.country) === filters.countryId);
+  const population = rows.reduce((total, row) => total + row.urbanPopulationMillions, 0);
+  return population > 0 ? population : getWebDataSummary().total_urban_population / 1_000_000;
+}
+
+function getMeanNpwei(filters: Filters, season: WebDataSeason) {
+  const rows = getCountryRows(season).filter((row) => filters.countryId === "all" || getCountryId(row.country) === filters.countryId);
+  if (rows.length === 0) return getHealthSeasonSummary(season).wa_npwei;
+  return rows.reduce((total, row) => total + row.npwei, 0) / rows.length;
+}
+
+function yearTrendMultiplier(year: number) {
+  const summary = getWebDataSummary();
+  const trendValue = getActiveWebDataSnapshot().seasonalTrend[String(year)]?.Annual;
+  if (!isFiniteNumber(trendValue) || !isFiniteNumber(summary.wa_pwe_annual) || summary.wa_pwe_annual === 0) return 1;
+  return trendValue / summary.wa_pwe_annual;
+}
+
+function fireCountProxy(npwei: number, year: number, season: WebDataSeason) {
+  const years = getWebDataYears();
+  const firstYear = years[0] ?? year;
+  const seasonMultiplier = season === "DJF" ? 1.25 : season === "JJA" ? 0.85 : 1;
+  const yearMultiplier = 1 + (year - firstYear) * 0.035;
+  return Math.round((180 + npwei * 9.5) * seasonMultiplier * yearMultiplier);
+}
+
+function pweToExposure(value: number) {
+  return value / 1_000_000_000_000;
+}
+
+function formatColumnValue(value: number) {
+  return Number.isFinite(value) ? value.toFixed(2) : "0.00";
+}
+
+function roundMetric(value: number, digits = 1) {
+  return Number(value.toFixed(digits));
+}
+
+function slugId(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 function normalize(value: number | null | undefined, min: number, max: number) {

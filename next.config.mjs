@@ -11,6 +11,7 @@ const nextConfig = {
   outputFileTracingRoot: projectRoot,
   transpilePackages: [
     "@deck.gl/core",
+    "@deck.gl/geo-layers",
     "@deck.gl/layers",
     "@deck.gl/react",
     "maplibre-gl",

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildNo2GridDataUrl,
   buildNo2TileUrlTemplate,
@@ -8,6 +8,7 @@ import {
   fetchNo2MapGridData,
   fetchNo2MapGridMetadata,
   fetchNo2MapTileMetadata,
+  getApiBaseUrl,
   getNo2MapSeasonYearRanges,
   loadNo2MapData,
   loadWebDataSnapshot,
@@ -29,9 +30,30 @@ import {
   type WebDataSnapshot
 } from "../src/data/webData";
 
+const ORIGINAL_NEXT_PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const ORIGINAL_NEXT_PUBLIC_API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+
 describe("backend web_data client", () => {
   afterEach(() => {
+    vi.unstubAllGlobals();
+    restoreEnvValue("NEXT_PUBLIC_API_BASE_URL", ORIGINAL_NEXT_PUBLIC_API_BASE_URL);
+    restoreEnvValue("NEXT_PUBLIC_API_BASE", ORIGINAL_NEXT_PUBLIC_API_BASE);
     resetActiveWebDataSnapshot();
+  });
+
+  it("uses the configured production API base URL without a trailing slash", () => {
+    process.env.NEXT_PUBLIC_API_BASE_URL = "https://exposure-backend-eta.vercel.app/";
+    delete process.env.NEXT_PUBLIC_API_BASE;
+
+    expect(getApiBaseUrl()).toBe("https://exposure-backend-eta.vercel.app");
+  });
+
+  it("uses the deployed backend on the Netlify hostname when the build env is missing", () => {
+    delete process.env.NEXT_PUBLIC_API_BASE_URL;
+    delete process.env.NEXT_PUBLIC_API_BASE;
+    vi.stubGlobal("window", { location: { hostname: "no2exposure.netlify.app" } });
+
+    expect(getApiBaseUrl()).toBe("https://exposure-backend-eta.vercel.app");
   });
 
   it("uses the backend dataset response when available", async () => {
@@ -392,6 +414,14 @@ describe("backend web_data client", () => {
 
 function cloneLocalSnapshot(): WebDataSnapshot {
   return structuredClone(getLocalWebDataSnapshot());
+}
+
+function restoreEnvValue(key: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[key];
+  } else {
+    process.env[key] = value;
+  }
 }
 
 function responseFrom(body: unknown, init: { ok?: boolean; status?: number } = {}) {

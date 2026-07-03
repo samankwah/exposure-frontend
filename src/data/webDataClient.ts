@@ -12,6 +12,9 @@ import {
 } from "@/data/webData";
 
 export const DEFAULT_API_BASE_URL = "http://localhost:8000";
+export const PRODUCTION_API_BASE_URL = "https://exposure-backend-eta.vercel.app";
+
+const PRODUCTION_FRONTEND_HOSTNAMES = new Set(["no2exposure.netlify.app"]);
 
 type BackendDatasetResponse = {
   citiesPwe?: Record<string, CityPweValue>;
@@ -92,7 +95,12 @@ const DEFAULT_NO2_MAP_DATA_RETRY_DELAY_MS = 400;
 const NO2_MAP_TILE_PREFLIGHT_LIMIT = 24;
 
 export function getApiBaseUrl() {
-  return (process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE || DEFAULT_API_BASE_URL).replace(/\/+$/, "");
+  return (
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_BASE ||
+    getBrowserProductionApiBaseUrl() ||
+    DEFAULT_API_BASE_URL
+  ).replace(/\/+$/, "");
 }
 
 export async function fetchBackendWebDataSnapshot(
@@ -420,6 +428,11 @@ function isRetryableNo2MapDataError(error: unknown) {
 function waitForNo2MapDataRetry(delayMs: number) {
   if (delayMs <= 0) return Promise.resolve();
   return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+function getBrowserProductionApiBaseUrl() {
+  if (typeof window === "undefined") return "";
+  return PRODUCTION_FRONTEND_HOSTNAMES.has(window.location.hostname) ? PRODUCTION_API_BASE_URL : "";
 }
 
 function normalizeNo2MapMetadataCommon(body: Record<string, unknown>) {

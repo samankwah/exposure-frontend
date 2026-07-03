@@ -11,6 +11,12 @@ cmd /c npm run dev
 
 Open `http://localhost:3000`.
 
+Local development uses `.env.example` as the template:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
+
 If the dev server crashes, OneDrive syncs generated files mid-run, or multiple dev servers were started from this checkout, restart with a clean Next cache:
 
 ```bash
@@ -18,6 +24,16 @@ cmd /c npm run dev:clean
 ```
 
 Run only one `next dev` process per checkout because all instances share `.next`.
+
+## Production Deployment
+
+The Netlify production build must call the deployed backend, not localhost:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=https://exposure-backend-eta.vercel.app
+```
+
+`netlify.toml` sets this value for Netlify builds. Redeploy Netlify after changing it because `NEXT_PUBLIC_*` values are baked into the Next.js client bundle at build time.
 
 ## Boundary Data
 

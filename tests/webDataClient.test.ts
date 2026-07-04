@@ -350,7 +350,14 @@ describe("backend web_data client", () => {
     expect(webDataClientSource).toContain("DEFAULT_NO2_MAP_DATA_RETRIES = 2");
     expect(webDataClientSource).toContain("NO2_MAP_TILE_PREFLIGHT_LIMIT");
     expect(source).toContain("getNo2MapSeasonYearRanges(metadata, season, year)");
-    expect(source).toContain("log10(pixel_exposure)");
+    expect(source).toContain("html: getTooltipHtml(properties, metadata)");
+    expect(source).toContain('className: "target-map-tooltip"');
+    expect(source).toContain("NO₂ column");
+    expect(source).toContain("Population");
+    expect(source).toContain("Pixel exposure");
+    expect(source).toContain("Log exposure");
+    expect(source).not.toContain("text: getTooltipText");
+    expect(source).not.toContain("log10(pixel_exposure)");
     expect(source).toContain("PWE = NO2 x Population, Log Scale");
     expect(source).toContain('"background-color": "#ffffff"');
     expect(source).not.toContain("local-country-context-fill");

@@ -6533,6 +6533,105 @@ button.map-ranking-row.active {
   left: 11px;
 }
 
+.target-map-tooltip {
+  z-index: 60;
+  width: min(292px, calc(100vw - 32px));
+  max-width: min(292px, calc(100vw - 32px));
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 6px;
+  background: rgba(7, 18, 31, 0.96);
+  color: #f8fbff;
+  padding: 10px 11px 9px;
+  box-shadow: 0 16px 34px rgba(2, 6, 23, 0.34);
+  pointer-events: none;
+}
+
+.target-map-tooltip-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.target-map-tooltip-header strong {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 0.74rem;
+  font-weight: 900;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.target-map-tooltip-header span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  border-radius: 999px;
+  background: rgba(14, 116, 144, 0.22);
+  color: #bae6fd;
+  padding: 0 7px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.target-map-tooltip-metrics {
+  display: grid;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.target-map-tooltip-row {
+  display: grid;
+  grid-template-columns: minmax(88px, 0.82fr) minmax(0, 1.18fr);
+  gap: 12px;
+  align-items: baseline;
+}
+
+.target-map-tooltip-label {
+  color: #9fb0c6;
+  font-size: 0.64rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.target-map-tooltip-value {
+  color: #f8fbff;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1.28;
+  text-align: right;
+}
+
+.target-map-tooltip-unit {
+  color: #cbd5e1;
+  font-family: var(--font-sans);
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.target-map-tooltip-times {
+  color: #cbd5e1;
+}
+
+.target-map-tooltip sup {
+  font-size: 0.72em;
+  line-height: 0;
+}
+
+.target-map-tooltip-footer {
+  margin-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  color: #8fb2ca;
+  padding-top: 6px;
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+
 .target-map-legend {
   position: absolute;
   z-index: 20;

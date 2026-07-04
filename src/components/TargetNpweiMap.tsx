@@ -322,7 +322,8 @@ export function TargetNpweiMap({
           if (layerMode === "no2" && !isAffectedPweFeature(properties)) return null;
           if (layerMode === "population" && !isPopulationFeature(properties)) return null;
           return {
-            text: getTooltipText(properties, metadata)
+            html: getTooltipHtml(properties, metadata),
+            className: "target-map-tooltip"
           };
         }}
         layers={layers}
@@ -532,20 +533,43 @@ function pointInPolygon(point: [number, number], polygon: [number, number][]) {
   return inside;
 }
 
-function getTooltipText(properties: No2TileProperties, metadata: No2MapDisplayMetadata) {
-  const city = properties.city ? `${properties.city}, ` : "";
-  const country = properties.country ?? "West Africa grid cell";
+function getTooltipHtml(properties: No2TileProperties, metadata: No2MapDisplayMetadata) {
   const season = properties.season ?? "Unknown season";
   const year = properties.year ?? "Unknown year";
+  const locationLabel = getTooltipLocationLabel(properties);
+  const contextLabel = `${season} ${year}`;
 
   return [
-    `${city}${country}`,
-    `NO2 column ${formatScientific(Number(properties.no2_column_molec_cm2 ?? 0), metadata.units.no2Column)}`,
-    `Population ${formatWholeNumber(Number(properties.population_count ?? 0))}`,
-    `Pixel exposure ${formatScientific(Number(properties.pixel_exposure ?? 0), metadata.units.pixelExposure)}`,
-    `log10(pixel_exposure) ${formatNumber(Number(properties.log10_pixel_exposure ?? 0), 2)}`,
-    `${season} ${year}`
-  ].join("\n");
+    `<div class="target-map-tooltip-header">`,
+    `<strong>${escapeHtml(locationLabel)}</strong>`,
+    `<span>${escapeHtml(contextLabel)}</span>`,
+    `</div>`,
+    `<div class="target-map-tooltip-metrics">`,
+    renderTooltipRow("NO₂ column", formatScientificHtml(Number(properties.no2_column_molec_cm2 ?? 0), metadata.units.no2Column)),
+    renderTooltipRow("Population", escapeHtml(formatWholeNumber(Number(properties.population_count ?? 0)))),
+    renderTooltipRow("Pixel exposure", formatScientificHtml(Number(properties.pixel_exposure ?? 0), metadata.units.pixelExposure)),
+    renderTooltipRow("Log exposure", escapeHtml(formatNumber(Number(properties.log10_pixel_exposure ?? 0), 2))),
+    `</div>`,
+    `<div class="target-map-tooltip-footer">PWE = NO₂ &times; population</div>`
+  ].join("");
+}
+
+function getTooltipLocationLabel(properties: No2TileProperties) {
+  const city = properties.city?.trim();
+  const country = properties.country?.trim();
+  if (city && country) return `${city}, ${country}`;
+  if (city) return city;
+  if (country) return country;
+  return "West Africa grid cell";
+}
+
+function renderTooltipRow(label: string, valueHtml: string) {
+  return [
+    `<div class="target-map-tooltip-row">`,
+    `<span class="target-map-tooltip-label">${escapeHtml(label)}</span>`,
+    `<span class="target-map-tooltip-value">${valueHtml}</span>`,
+    `</div>`
+  ].join("");
 }
 
 function getLogExposureColor(value: number, range: NumericRange, alpha: number): [number, number, number, number] {
@@ -645,15 +669,17 @@ function formatLegendValue(value: number, layerMode: TargetMapLayerMode) {
   return formatNumber(value, 1);
 }
 
-function formatScientific(value: number, units: string) {
-  const displayUnits = formatDisplayUnits(units);
+function formatScientificHtml(value: number, units: string) {
+  const displayUnits = formatDisplayUnitsHtml(units);
   if (!Number.isFinite(value) || value <= 0) return `No data ${displayUnits}`;
   const [mantissa, exponent] = value.toExponential(2).split("e");
-  return `${mantissa} x 10^${Number(exponent)} ${displayUnits}`;
+  return `${mantissa} <span class="target-map-tooltip-times">&times;</span> 10<sup>${Number(
+    exponent
+  )}</sup> <span class="target-map-tooltip-unit">${displayUnits}</span>`;
 }
 
-function formatDisplayUnits(units: string) {
-  return units.replaceAll("cm-2", "cm^-2");
+function formatDisplayUnitsHtml(units: string) {
+  return escapeHtml(units).replaceAll("cm-2", "cm<sup>-2</sup>").replaceAll("cm^-2", "cm<sup>-2</sup>");
 }
 
 function formatWholeNumber(value: number) {
@@ -669,4 +695,13 @@ function formatCompactNumber(value: number) {
 function formatNumber(value: number, digits: number) {
   if (!Number.isFinite(value)) return "No data";
   return value.toFixed(digits);
+}
+
+function escapeHtml(value: string | number) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }

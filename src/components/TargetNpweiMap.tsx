@@ -322,7 +322,7 @@ export function TargetNpweiMap({
           if (layerMode === "no2" && !isAffectedPweFeature(properties)) return null;
           if (layerMode === "population" && !isPopulationFeature(properties)) return null;
           return {
-            html: getTooltipHtml(properties, metadata),
+            html: getTooltipHtml(properties, metadata, rows),
             className: "target-map-tooltip"
           };
         }}
@@ -533,10 +533,10 @@ function pointInPolygon(point: [number, number], polygon: [number, number][]) {
   return inside;
 }
 
-function getTooltipHtml(properties: No2TileProperties, metadata: No2MapDisplayMetadata) {
+function getTooltipHtml(properties: No2TileProperties, metadata: No2MapDisplayMetadata, rows: CityNpweiRow[]) {
   const season = properties.season ?? "Unknown season";
   const year = properties.year ?? "Unknown year";
-  const locationLabel = getTooltipLocationLabel(properties);
+  const locationLabel = getTooltipLocationLabel(properties, rows);
   const contextLabel = `${season} ${year}`;
 
   return [
@@ -554,13 +554,36 @@ function getTooltipHtml(properties: No2TileProperties, metadata: No2MapDisplayMe
   ].join("");
 }
 
-function getTooltipLocationLabel(properties: No2TileProperties) {
+export function getTooltipLocationLabel(properties: No2TileProperties, rows: CityNpweiRow[]) {
   const city = properties.city?.trim();
   const country = properties.country?.trim();
   if (city && country) return `${city}, ${country}`;
   if (city) return city;
   if (country) return country;
+
+  const nearestRow = getNearestCityRow(properties, rows);
+  if (nearestRow) return `${nearestRow.name}, ${nearestRow.country}`;
+
   return "West Africa grid cell";
+}
+
+function getNearestCityRow(properties: No2TileProperties, rows: CityNpweiRow[]): CityNpweiRow | null {
+  const lon = Number(properties.lon);
+  const lat = Number(properties.lat);
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return null;
+
+  let nearestRow: CityNpweiRow | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+
+  for (const row of rows) {
+    const distance = getDistanceFromCityDegrees(lon, lat, row);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestRow = row;
+    }
+  }
+
+  return nearestRow;
 }
 
 function renderTooltipRow(label: string, valueHtml: string) {

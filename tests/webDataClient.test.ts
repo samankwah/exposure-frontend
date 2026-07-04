@@ -33,6 +33,12 @@ import {
 const ORIGINAL_NEXT_PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const ORIGINAL_NEXT_PUBLIC_API_BASE = process.env.NEXT_PUBLIC_API_BASE;
 
+vi.mock("@deck.gl/react", () => ({ default: () => null }));
+vi.mock("@deck.gl/layers", () => ({ GeoJsonLayer: class MockGeoJsonLayer {} }));
+vi.mock("@deck.gl/geo-layers", () => ({ MVTLayer: class MockMvtLayer {} }));
+vi.mock("maplibre-gl", () => ({}));
+vi.mock("react-map-gl/maplibre", () => ({ default: () => null, ScaleControl: () => null }));
+
 describe("backend web_data client", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -350,7 +356,7 @@ describe("backend web_data client", () => {
     expect(webDataClientSource).toContain("DEFAULT_NO2_MAP_DATA_RETRIES = 2");
     expect(webDataClientSource).toContain("NO2_MAP_TILE_PREFLIGHT_LIMIT");
     expect(source).toContain("getNo2MapSeasonYearRanges(metadata, season, year)");
-    expect(source).toContain("html: getTooltipHtml(properties, metadata)");
+    expect(source).toContain("html: getTooltipHtml(properties, metadata, rows)");
     expect(source).toContain('className: "target-map-tooltip"');
     expect(source).toContain("NO₂ column");
     expect(source).toContain("Population");
@@ -387,6 +393,30 @@ describe("backend web_data client", () => {
     expect(legacyMapSource).toContain("basemaps.cartocdn.com");
     expect(legacyMapSource).not.toContain("country-labels");
     expect(legacyMapSource).not.toContain("COUNTRY_LABELS");
+  });
+
+  it("derives target map tooltip location labels from current city rows", async () => {
+    const source = readFileSync(join(process.cwd(), "src", "components", "TargetNpweiMap.tsx"), "utf-8");
+
+    expect(source).toContain("function getTooltipHtml(properties: No2TileProperties, metadata: No2MapDisplayMetadata, rows: CityNpweiRow[])");
+    expect(source).toContain("const locationLabel = getTooltipLocationLabel(properties, rows)");
+    expect(source).toContain("export function getTooltipLocationLabel(properties: No2TileProperties, rows: CityNpweiRow[])");
+    expect(source).toContain("if (city && country) return `${city}, ${country}`;");
+    expect(source).toContain("const nearestRow = getNearestCityRow(properties, rows);");
+    expect(source).toContain("return `${nearestRow.name}, ${nearestRow.country}`;");
+    expect(source).toContain("getDistanceFromCityDegrees(lon, lat, row)");
+    expect(source).not.toContain("Near ");
+    expect(source.match(/West Africa grid cell/g)).toHaveLength(1);
+
+    const { getTooltipLocationLabel } = await import("../src/components/TargetNpweiMap");
+    const lagos = getCityRows("Annual").find((row) => row.name === "Lagos" && row.country === "Nigeria");
+    if (!lagos) throw new Error("Expected Lagos city row in local data");
+
+    expect(getTooltipLocationLabel({ city: "Lagos", country: "Nigeria" }, [])).toBe("Lagos, Nigeria");
+    expect(getTooltipLocationLabel({ city: "Lagos" }, [])).toBe("Lagos");
+    expect(getTooltipLocationLabel({ country: "Nigeria" }, [])).toBe("Nigeria");
+    expect(getTooltipLocationLabel({ lat: lagos.lat + 0.02, lon: lagos.lon - 0.02 }, [lagos])).toBe("Lagos, Nigeria");
+    expect(getTooltipLocationLabel({}, [lagos])).toBe("West Africa grid cell");
   });
 
   it("enables SDF font rendering for remaining outlined map text labels", () => {

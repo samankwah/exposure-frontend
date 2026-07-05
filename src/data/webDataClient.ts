@@ -93,6 +93,10 @@ export type WebDataLoadResult = {
 const DEFAULT_NO2_MAP_DATA_RETRIES = 2;
 const DEFAULT_NO2_MAP_DATA_RETRY_DELAY_MS = 400;
 const NO2_MAP_TILE_PREFLIGHT_LIMIT = 24;
+const no2MapDataLoadCache = new Map<string, Promise<No2MapDataLoadResult>>();
+const no2TileMetadataRequestCache = new Map<string, Promise<No2MapTileMetadata>>();
+const no2GridMetadataRequestCache = new Map<string, Promise<No2MapGridMetadata>>();
+const no2GridDataRequestCache = new Map<string, Promise<No2MapGridFeatureCollection>>();
 
 export function getApiBaseUrl() {
   return (
@@ -205,6 +209,32 @@ export async function loadNo2MapData(
   year: number,
   options: LoadNo2MapDataOptions = {}
 ): Promise<No2MapDataLoadResult> {
+  const cacheKey = getNo2MapDataCacheKey(apiBaseUrl, season, year);
+  const cachedLoad = no2MapDataLoadCache.get(cacheKey);
+  if (cachedLoad) return cachedLoad;
+
+  const loadPromise = loadNo2MapDataWithRetries(fetcher, apiBaseUrl, season, year, options).catch((error) => {
+    no2MapDataLoadCache.delete(cacheKey);
+    throw error;
+  });
+  no2MapDataLoadCache.set(cacheKey, loadPromise);
+  return loadPromise;
+}
+
+export function clearNo2MapDataCache() {
+  no2MapDataLoadCache.clear();
+  no2TileMetadataRequestCache.clear();
+  no2GridMetadataRequestCache.clear();
+  no2GridDataRequestCache.clear();
+}
+
+async function loadNo2MapDataWithRetries(
+  fetcher: typeof fetch,
+  apiBaseUrl: string,
+  season: WebDataSeason,
+  year: number,
+  options: LoadNo2MapDataOptions
+): Promise<No2MapDataLoadResult> {
   const retries = Math.max(0, options.retries ?? DEFAULT_NO2_MAP_DATA_RETRIES);
   const retryDelayMs = Math.max(0, options.retryDelayMs ?? DEFAULT_NO2_MAP_DATA_RETRY_DELAY_MS);
 
@@ -295,9 +325,18 @@ async function loadNo2MapDataOnce(
   const tileMetadata = await fetchSupportedNo2MapTileMetadata(fetcher, apiBaseUrl, season, year);
   if (tileMetadata) return { source: "tile", metadata: tileMetadata };
 
-  const metadata = await fetchNo2MapGridMetadata(fetcher, apiBaseUrl);
+  return loadNo2MapGridFallback(fetcher, apiBaseUrl, season, year);
+}
+
+async function loadNo2MapGridFallback(
+  fetcher: typeof fetch,
+  apiBaseUrl: string,
+  season: WebDataSeason,
+  year: number
+): Promise<No2MapDataLoadResult> {
+  const metadata = await fetchCachedNo2MapGridMetadata(fetcher, apiBaseUrl, season, year);
   assertNo2MapMetadataSupports(metadata, season, year);
-  const data = await fetchNo2MapGridData(fetcher, metadata, season, year, apiBaseUrl);
+  const data = await fetchCachedNo2MapGridData(fetcher, metadata, season, year, apiBaseUrl);
   return { source: "grid", metadata, data };
 }
 
@@ -308,9 +347,11 @@ async function fetchSupportedNo2MapTileMetadata(
   year: number
 ) {
   try {
-    const metadata = await fetchNo2MapTileMetadata(fetcher, apiBaseUrl);
+    const metadata = await fetchCachedNo2MapTileMetadata(fetcher, apiBaseUrl, season, year);
     if (!metadata.availableSeasons.includes(season) || !metadata.availableYears.includes(year)) return null;
+    const gridFallback = settleNo2MapGridFallback(loadNo2MapGridFallback(fetcher, apiBaseUrl, season, year));
     if (await hasNo2MapInitialTileCoverage(fetcher, metadata, season, year, apiBaseUrl)) return metadata;
+    await unwrapSettledNo2MapGridFallback(gridFallback);
   } catch (error) {
     if (!isNo2MapTileUnavailableError(error)) throw error;
   }
@@ -328,19 +369,47 @@ async function hasNo2MapInitialTileCoverage(
   const urls = buildNo2InitialTileProbeUrls(metadata, season, year, apiBaseUrl);
   if (urls.length === 0) return false;
 
-  for (const url of urls) {
-    const response = await fetcher(url, {
-      cache: "no-store",
-      headers: {
-        Accept: "application/vnd.mapbox-vector-tile"
-      }
+  return new Promise<boolean>((resolve, reject) => {
+    let remaining = urls.length;
+    let settled = false;
+
+    urls.forEach((url) => {
+      probeNo2MapTileCoverage(fetcher, url).then(
+        (covered) => {
+          if (settled) return;
+          if (!covered) {
+            settled = true;
+            resolve(false);
+            return;
+          }
+
+          remaining -= 1;
+          if (remaining === 0) {
+            settled = true;
+            resolve(true);
+          }
+        },
+        (error: unknown) => {
+          if (settled) return;
+          settled = true;
+          reject(error);
+        }
+      );
     });
+  });
+}
 
-    await cancelNo2MapTileProbeBody(response);
-    if (response.status === 204 || response.status === 404) return false;
-    if (!response.ok) throw new Error(`NO2 map tile probe request failed with ${response.status}`);
-  }
+async function probeNo2MapTileCoverage(fetcher: typeof fetch, url: string) {
+  const response = await fetcher(url, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/vnd.mapbox-vector-tile"
+    }
+  });
 
+  await cancelNo2MapTileProbeBody(response);
+  if (response.status === 204 || response.status === 404) return false;
+  if (!response.ok) throw new Error(`NO2 map tile probe request failed with ${response.status}`);
   return true;
 }
 
@@ -401,6 +470,78 @@ function assertNo2MapMetadataSupports(metadata: No2MapTileMetadata | No2MapGridM
   if (!metadata.availableYears.includes(year)) {
     throw new Error(`Backend NO2 population grid is unavailable for ${year}.`);
   }
+}
+
+function fetchCachedNo2MapTileMetadata(
+  fetcher: typeof fetch,
+  apiBaseUrl: string,
+  season: WebDataSeason,
+  year: number
+) {
+  const cacheKey = getNo2MapDataCacheKey(apiBaseUrl, season, year);
+  const cachedRequest = no2TileMetadataRequestCache.get(cacheKey);
+  if (cachedRequest) return cachedRequest;
+
+  const request = fetchNo2MapTileMetadata(fetcher, apiBaseUrl).catch((error) => {
+    no2TileMetadataRequestCache.delete(cacheKey);
+    throw error;
+  });
+  no2TileMetadataRequestCache.set(cacheKey, request);
+  return request;
+}
+
+function fetchCachedNo2MapGridMetadata(
+  fetcher: typeof fetch,
+  apiBaseUrl: string,
+  season: WebDataSeason,
+  year: number
+) {
+  const cacheKey = getNo2MapDataCacheKey(apiBaseUrl, season, year);
+  const cachedRequest = no2GridMetadataRequestCache.get(cacheKey);
+  if (cachedRequest) return cachedRequest;
+
+  const request = fetchNo2MapGridMetadata(fetcher, apiBaseUrl).catch((error) => {
+    no2GridMetadataRequestCache.delete(cacheKey);
+    throw error;
+  });
+  no2GridMetadataRequestCache.set(cacheKey, request);
+  return request;
+}
+
+function fetchCachedNo2MapGridData(
+  fetcher: typeof fetch,
+  metadata: No2MapGridMetadata,
+  season: WebDataSeason,
+  year: number,
+  apiBaseUrl: string
+) {
+  const cacheKey = getNo2MapDataCacheKey(apiBaseUrl, season, year);
+  const cachedRequest = no2GridDataRequestCache.get(cacheKey);
+  if (cachedRequest) return cachedRequest;
+
+  const request = fetchNo2MapGridData(fetcher, metadata, season, year, apiBaseUrl).catch((error) => {
+    no2GridDataRequestCache.delete(cacheKey);
+    throw error;
+  });
+  no2GridDataRequestCache.set(cacheKey, request);
+  return request;
+}
+
+function settleNo2MapGridFallback(promise: Promise<No2MapDataLoadResult>) {
+  return promise.then(
+    (value) => ({ status: "fulfilled" as const, value }),
+    (reason: unknown) => ({ status: "rejected" as const, reason })
+  );
+}
+
+async function unwrapSettledNo2MapGridFallback(promise: ReturnType<typeof settleNo2MapGridFallback>) {
+  const result = await promise;
+  if (result.status === "rejected") throw result.reason;
+  return result.value;
+}
+
+function getNo2MapDataCacheKey(apiBaseUrl: string, season: WebDataSeason, year: number) {
+  return `${apiBaseUrl.replace(/\/+$/, "")}|${season}|${year}`;
 }
 
 function isNo2MapTileUnavailableError(error: unknown) {

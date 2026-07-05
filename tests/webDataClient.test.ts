@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildNo2GridDataUrl,
   buildNo2TileUrlTemplate,
+  clearNo2MapDataCache,
   fetchBackendWebDataSnapshot,
   fetchNo2MapGridData,
   fetchNo2MapGridMetadata,
@@ -44,6 +45,7 @@ describe("backend web_data client", () => {
     vi.unstubAllGlobals();
     restoreEnvValue("NEXT_PUBLIC_API_BASE_URL", ORIGINAL_NEXT_PUBLIC_API_BASE_URL);
     restoreEnvValue("NEXT_PUBLIC_API_BASE", ORIGINAL_NEXT_PUBLIC_API_BASE);
+    clearNo2MapDataCache();
     resetActiveWebDataSnapshot();
   });
 
@@ -252,6 +254,8 @@ describe("backend web_data client", () => {
       const requestUrl = String(url);
       requests.push(requestUrl);
       if (requestUrl.endsWith("/api/map/no2/metadata")) return responseFrom(sampleMapMetadata());
+      if (requestUrl.endsWith("/api/map/no2/grid/metadata")) return responseFrom(sampleGridMetadata());
+      if (requestUrl.endsWith("/api/map/no2/grid/Annual/2024.json")) return responseFrom(sampleGridFeatureCollection());
       if (requestUrl.includes("/api/map/no2/tiles/Annual/2024/4/")) return responseFrom(null);
       throw new Error(`Unexpected request ${requestUrl}`);
     };
@@ -261,8 +265,7 @@ describe("backend web_data client", () => {
     expect(result.source).toBe("tile");
     expect(result.metadata.layerName).toBe("no2_pixels");
     expect(requests[0]).toBe("http://backend.test/api/map/no2/metadata");
-    expect(requests.slice(1).length).toBeGreaterThan(0);
-    expect(requests.slice(1).every((request) => request.includes("/api/map/no2/tiles/Annual/2024/4/"))).toBe(true);
+    expect(requests.some((request) => request.includes("/api/map/no2/tiles/Annual/2024/4/"))).toBe(true);
     expect(requests.some((request) => request.includes("/api/map/no2/ti/"))).toBe(false);
   });
 
@@ -287,6 +290,30 @@ describe("backend web_data client", () => {
       "http://backend.test/api/map/no2/grid/DJF/2024.json"
     ]);
   });
+  it("shares cached and in-flight NO2 map requests for duplicate load targets", async () => {
+    const requests: string[] = [];
+    const fetcher: typeof fetch = async (url) => {
+      const requestUrl = String(url);
+      requests.push(requestUrl);
+      if (requestUrl.endsWith("/api/map/no2/metadata")) return responseFrom(null, { status: 204 });
+      if (requestUrl.endsWith("/api/map/no2/grid/metadata")) return responseFrom(sampleGridMetadata());
+      if (requestUrl.endsWith("/api/map/no2/grid/DJF/2024.json")) return responseFrom(sampleGridFeatureCollection());
+      throw new Error(`Unexpected request ${requestUrl}`);
+    };
+
+    const [firstResult, secondResult] = await Promise.all([
+      loadNo2MapData(fetcher, "http://backend.test", "DJF", 2024, { retryDelayMs: 0 }),
+      loadNo2MapData(fetcher, "http://backend.test", "DJF", 2024, { retryDelayMs: 0 })
+    ]);
+    const cachedResult = await loadNo2MapData(fetcher, "http://backend.test", "DJF", 2024, { retryDelayMs: 0 });
+
+    expect(firstResult.source).toBe("grid");
+    expect(secondResult).toBe(firstResult);
+    expect(cachedResult).toBe(firstResult);
+    expect(requests.filter((request) => request.endsWith("/api/map/no2/metadata"))).toHaveLength(1);
+    expect(requests.filter((request) => request.endsWith("/api/map/no2/grid/metadata"))).toHaveLength(1);
+    expect(requests.filter((request) => request.endsWith("/api/map/no2/grid/DJF/2024.json"))).toHaveLength(1);
+  });
 
   it("retries transient metadata fetch failures and succeeds without a page refresh", async () => {
     let metadataAttempts = 0;
@@ -297,6 +324,8 @@ describe("backend web_data client", () => {
         if (metadataAttempts < 3) throw new Error("NO2 tile metadata is warming up");
         return responseFrom(sampleMapMetadata());
       }
+      if (requestUrl.endsWith("/api/map/no2/grid/metadata")) return responseFrom(sampleGridMetadata());
+      if (requestUrl.endsWith("/api/map/no2/grid/Annual/2024.json")) return responseFrom(sampleGridFeatureCollection());
       if (requestUrl.includes("/api/map/no2/tiles/Annual/2024/4/")) return responseFrom(null);
       throw new Error(`Unexpected request ${requestUrl}`);
     };
@@ -325,6 +354,41 @@ describe("backend web_data client", () => {
     expect(requests.some((request) => request.includes("/api/map/no2/tiles/DJF/2024/4/"))).toBe(true);
     expect(requests).toContain("http://backend.test/api/map/no2/grid/metadata");
     expect(result.data.features).toHaveLength(1);
+  });
+  it("starts grid fallback while tile probes are still pending", async () => {
+    const requests: string[] = [];
+    const slowTileUrl = "http://backend.test/api/map/no2/tiles/Annual/2024/4/7/7.mvt";
+    const incompleteTileUrl = "http://backend.test/api/map/no2/tiles/Annual/2024/4/8/7.mvt";
+    let releaseSlowProbe: () => void = () => {};
+    let slowProbeResolved = false;
+    const fetcher: typeof fetch = async (url) => {
+      const requestUrl = String(url);
+      requests.push(requestUrl);
+      if (requestUrl.endsWith("/api/map/no2/metadata")) return responseFrom(sampleMapMetadata());
+      if (requestUrl.endsWith("/api/map/no2/grid/metadata")) return responseFrom(sampleGridMetadata());
+      if (requestUrl.endsWith("/api/map/no2/grid/Annual/2024.json")) return responseFrom(sampleGridFeatureCollection());
+      if (requestUrl === slowTileUrl) {
+        return new Promise<Response>((resolve) => {
+          releaseSlowProbe = () => {
+            slowProbeResolved = true;
+            resolve(responseFrom(null));
+          };
+        });
+      }
+      if (requestUrl === incompleteTileUrl) return responseFrom(null, { status: 404 });
+      throw new Error(`Unexpected request ${requestUrl}`);
+    };
+
+    const result = await loadNo2MapData(fetcher, "http://backend.test", "Annual", 2024, { retryDelayMs: 0 });
+
+    if (result.source !== "grid") throw new Error(`Expected grid source, received ${result.source}`);
+    expect(result.data.features).toHaveLength(1);
+    expect(slowProbeResolved).toBe(false);
+    expect(requests).toContain(slowTileUrl);
+    expect(requests).toContain(incompleteTileUrl);
+    expect(requests.indexOf("http://backend.test/api/map/no2/grid/metadata")).toBeLessThan(requests.indexOf(slowTileUrl));
+
+    releaseSlowProbe();
   });
 
   it("stops with a clear error after the NO2 map data retry budget is exhausted", async () => {
@@ -393,6 +457,19 @@ describe("backend web_data client", () => {
     expect(legacyMapSource).toContain("basemaps.cartocdn.com");
     expect(legacyMapSource).not.toContain("country-labels");
     expect(legacyMapSource).not.toContain("COUNTRY_LABELS");
+  });
+
+
+  it("omits the selected-year summary row from the map explorer", () => {
+    const mapExplorerSource = readFileSync(join(process.cwd(), "src", "components", "MapExplorer.tsx"), "utf-8");
+    const globalStyles = readFileSync(join(process.cwd(), "src", "app", "globals.css"), "utf-8");
+
+    expect(mapExplorerSource).toContain("<MapKpiStrip");
+    expect(mapExplorerSource).toContain("<TargetNpweiMap");
+    expect(mapExplorerSource).not.toContain("SelectedYearSummaryPanel");
+    expect(mapExplorerSource).not.toContain("Selected Year Summary");
+    expect(mapExplorerSource).not.toContain("buildSelectedYearSummary");
+    expect(globalStyles).not.toContain("target-selected-year-summary");
   });
 
   it("derives target map tooltip location labels from current city rows", async () => {

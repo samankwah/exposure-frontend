@@ -138,7 +138,7 @@ const riskToneAliases: Record<LegacyRiskTone, RiskTone> = {
 export const WEB_DATA_SEASONS = ["Annual", "DJF", "JJA"] as const satisfies readonly WebDataSeason[];
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 export const NO2_COLUMN_UNIT = "x10^15 molecules cm^-2";
-export const NO2_COLUMN_UNIT_LABEL = "x10^15 molecules cm^-2";
+export const NO2_COLUMN_UNIT_LABEL = "\u00d710^15 molecules cm\u207b\u00b2";
 
 const riskTiers: Array<{ color: string; label: RiskTierLabel; min: number; tone: RiskTone }> = [
   { label: "Very High", min: 80, color: "#ef4444", tone: "very-high" },
@@ -575,8 +575,7 @@ export function toNo2ColumnValue(value: number, _scale?: string) {
 
 export function formatPwe(value: number) {
   if (!Number.isFinite(value)) return "No data";
-  const [mantissa, exponent] = value.toExponential(2).split("e");
-  return `${mantissa} x 10^${Number(exponent)} molec cm^-2`;
+  return `${formatColumnValue(pweToColumn(value))} ${NO2_COLUMN_UNIT_LABEL}`;
 }
 
 export function buildCitiesCsv(season: WebDataSeason) {

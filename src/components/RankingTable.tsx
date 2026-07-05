@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronRight } from "lucide-react";
+import { NO2_COLUMN_UNIT_LABEL } from "@/data/webData";
 import type { RankingRow } from "@/types/exposure";
 
 export function RankingTable({
@@ -21,7 +22,10 @@ export function RankingTable({
       <div className="ranking-table" role="table" aria-label="Country NO₂ ranking">
         <div className="table-row table-head" role="row">
           <span role="columnheader">Country</span>
-          <span role="columnheader">NO₂</span>
+          <span className="no2-unit-column" role="columnheader">
+            <strong>NO{"\u2082"}</strong>
+            <small>{NO2_COLUMN_UNIT_LABEL}</small>
+          </span>
           <span role="columnheader">Exposure</span>
           <span role="columnheader">Fire</span>
         </div>

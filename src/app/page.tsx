@@ -341,7 +341,7 @@ function MonthlyExposureChart({ data }: { data: TrendPoint[] }) {
         frame={frame}
         scale={no2Scale}
         ticks={no2Axis.ticks}
-        title="NO₂ column"
+        title={NO2_COLUMN_UNIT_LABEL}
         values={no2Values}
       />
       <ChartYAxisLabels
@@ -518,7 +518,7 @@ function ChartYAxisLabels({
   const tickSize = 6;
   const tickPadding = 8;
   const labelX = side === "right" ? axisX + tickSize + tickPadding : axisX - tickSize - tickPadding;
-  const axisTitleX = side === "right" ? (typeof frame.width === "number" ? frame.width - 22 : chartRight + 58) : Math.max(14, frame.left - 58);
+  const axisTitleX = side === "right" ? chartRight + 56 : Math.max(14, frame.left - 58);
   const axisTitleY = frame.top + (frame.bottom - frame.top) / 2;
   const resolvedTextAnchor = textAnchor ?? (side === "right" ? "start" : "end");
   const titleRotation = side === "right" ? 90 : -90;

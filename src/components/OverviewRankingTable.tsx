@@ -3,7 +3,7 @@
 import { useMemo, type CSSProperties } from "react";
 import { useObservatoryFilters } from "@/components/ObservatoryContext";
 import { useBackendWebData } from "@/data/useWebData";
-import { getOverviewCountryRanking } from "@/data/webData";
+import { NO2_COLUMN_UNIT_LABEL, getOverviewCountryRanking } from "@/data/webData";
 
 type BarStyle = CSSProperties & Record<"--bar-width", string>;
 
@@ -26,7 +26,7 @@ export function OverviewRankingTable() {
           <span role="columnheader">Country</span>
           <span role="columnheader">
             NO{"\u2082"} Column
-            <small>(x10^15 molecules cm^-2)</small>
+            <small>({NO2_COLUMN_UNIT_LABEL})</small>
           </span>
           <span className="population-column-header" role="columnheader">
             <span className="population-column-title">Urban Population</span>

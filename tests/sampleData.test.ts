@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   COUNTRIES,
   DEFAULT_FILTERS,
+  NO2_COLUMN_UNIT_LABEL,
   YEARS,
   getAnnualTrend,
   getCountryRanking,
@@ -20,7 +21,9 @@ describe("sample analytics", () => {
     const metrics = getSummaryMetrics(DEFAULT_FILTERS);
 
     expect(metrics).toHaveLength(4);
-    expect(metrics[0].value).toContain("ppb");
+    expect(metrics[0].value).not.toContain("ppb");
+    expect(metrics[0].detail).toContain(NO2_COLUMN_UNIT_LABEL);
+    expect(metrics[3].detail).toContain(NO2_COLUMN_UNIT_LABEL);
   });
 
   it("filters rankings by selected country", () => {

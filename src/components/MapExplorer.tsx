@@ -38,15 +38,12 @@ const COUNTRY_IDS: Record<string, string> = {
 type VisualLayerMode = "no2" | "population";
 type BarStyle = CSSProperties & Record<"--bar-width", string>;
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
-
 export function MapExplorer() {
   const { filters, setFilters } = useObservatoryFilters();
   const { version: dataVersion } = useBackendWebData();
   const [season, setSeason] = useState<WebDataSeason>("DJF");
   const [visualLayer, setVisualLayer] = useState<VisualLayerMode>("no2");
   const [selectedCityName, setSelectedCityName] = useState("all");
-  const [month, setMonth] = useState<number>(filters.month === "all" ? 12 : filters.month);
   const availableYears = useMemo(() => {
     void dataVersion;
     return getWebDataYears();
@@ -100,7 +97,6 @@ export function MapExplorer() {
   const patchFilters = (next: Partial<Filters>) => {
     setFilters((current) => ({ ...current, ...next }));
   };
-
   useEffect(() => {
     if (availableYears.length === 0) return;
 
@@ -178,13 +174,6 @@ export function MapExplorer() {
           />
         </label>
 
-        <label className="target-map-slider">
-          <span>
-            Month <b>{MONTHS[month - 1]}</b>
-          </span>
-          <input max={12} min={1} step={1} type="range" value={month} onChange={(event) => setMonth(Number(event.target.value))} />
-        </label>
-
         <div className="target-map-layer-toggle" role="group" aria-label="Map layer">
           <button className={visualLayer === "no2" ? "active" : ""} type="button" onClick={() => setVisualLayer("no2")}>
             <Wind size={13} aria-hidden />
@@ -225,7 +214,6 @@ export function MapExplorer() {
               rows={activeCityRows}
               season={season}
               year={filters.year}
-              month={month}
             />
             <div className="target-pop-layer-note">
               {visualLayer === "population" ? "Population count" : "PWE = NO2 x Population"}

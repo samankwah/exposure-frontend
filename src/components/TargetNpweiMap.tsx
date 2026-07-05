@@ -19,7 +19,7 @@ import {
   type No2MapTileMetadata,
   type NumericRange
 } from "@/data/webDataClient";
-import type { CityNpweiRow, WebDataSeason } from "@/data/webData";
+import { NO2_COLUMN_UNIT_LABEL, pweToColumn, type CityNpweiRow, type WebDataSeason } from "@/data/webData";
 
 const MAP_STYLE = {
   version: 8,
@@ -103,17 +103,14 @@ export function TargetNpweiMap({
   rows,
   season,
   year,
-  month,
   layerMode = "no2"
 }: {
   filterActive?: boolean;
   rows: CityNpweiRow[];
   season: WebDataSeason;
   year: number;
-  month: number;
   layerMode?: TargetMapLayerMode;
 }) {
-  void month;
   const [isClient, setIsClient] = useState(false);
   const [mapDataState, setMapDataState] = useState<MapDataState>({ status: "loading" });
   const [viewState, setViewState] = useState<MapViewState>(INITIAL_VIEW_STATE);
@@ -545,7 +542,7 @@ function getTooltipHtml(properties: No2TileProperties, metadata: No2MapDisplayMe
     `<span>${escapeHtml(contextLabel)}</span>`,
     `</div>`,
     `<div class="target-map-tooltip-metrics">`,
-    renderTooltipRow("NO₂ column", formatScientificHtml(Number(properties.no2_column_molec_cm2 ?? 0), metadata.units.no2Column)),
+    renderTooltipRow("NO₂ column", formatNo2ColumnHtml(Number(properties.no2_column_molec_cm2 ?? 0))),
     renderTooltipRow("Population", escapeHtml(formatWholeNumber(Number(properties.population_count ?? 0)))),
     renderTooltipRow("Pixel exposure", formatScientificHtml(Number(properties.pixel_exposure ?? 0), metadata.units.pixelExposure)),
     renderTooltipRow("Log exposure", escapeHtml(formatNumber(Number(properties.log10_pixel_exposure ?? 0), 2))),
@@ -703,6 +700,12 @@ function formatScientificHtml(value: number, units: string) {
 
 function formatDisplayUnitsHtml(units: string) {
   return escapeHtml(units).replaceAll("cm-2", "cm<sup>-2</sup>").replaceAll("cm^-2", "cm<sup>-2</sup>");
+}
+
+function formatNo2ColumnHtml(value: number) {
+  const displayUnits = `<span class="target-map-tooltip-unit">${formatDisplayUnitsHtml(NO2_COLUMN_UNIT_LABEL)}</span>`;
+  if (!Number.isFinite(value) || value <= 0) return `No data ${displayUnits}`;
+  return `${escapeHtml(pweToColumn(value).toFixed(2))} ${displayUnits}`;
 }
 
 function formatWholeNumber(value: number) {

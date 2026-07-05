@@ -18,9 +18,13 @@ import {
   type No2MapGridMetadata
 } from "../src/data/webDataClient";
 import {
+  DEFAULT_FILTERS,
+  NO2_COLUMN_UNIT,
+  NO2_COLUMN_UNIT_LABEL,
   getCityRows,
   getCountryRows,
   getHealthSeasonSummary,
+  getOverviewSummaryMetrics,
   getSeasonalTrendRows,
   getLocalWebDataSnapshot,
   RISK_TIER_ORDER,
@@ -183,8 +187,20 @@ describe("backend web_data client", () => {
     expect(getCityRows("Annual")[0].riskTone).toBe("very-high");
   });
 
-  it("formats PWE in source units", () => {
-    expect(formatPwe(3_354_604_383_762_359)).toBe("3.35 x 10^15 molec cm^-2");
+  it("formats PWE in scaled NO2 column display units", () => {
+    expect(NO2_COLUMN_UNIT).toBe("x10^15 molecules cm^-2");
+    expect(NO2_COLUMN_UNIT_LABEL).toBe("\u00d710^15 molecules cm\u207b\u00b2");
+    expect(formatPwe(3_354_604_383_762_359)).toBe(`3.35 ${NO2_COLUMN_UNIT_LABEL}`);
+  });
+
+  it("labels dashboard NO2 summary metrics with scaled column units", () => {
+    const metrics = getOverviewSummaryMetrics(DEFAULT_FILTERS);
+
+    expect(metrics.find((metric) => metric.label === "West Africa average NO2")?.detail).toBe(NO2_COLUMN_UNIT_LABEL);
+    expect(metrics.find((metric) => metric.label === "Highest NO2 country")?.detail).toBe(NO2_COLUMN_UNIT_LABEL);
+    expect(metrics.find((metric) => metric.label === "Highest urban hotspot")?.detail).toBe(NO2_COLUMN_UNIT_LABEL);
+    expect(metrics.find((metric) => metric.label === "NO2 color range")?.detail).toBe(NO2_COLUMN_UNIT_LABEL);
+    expect(metrics.find((metric) => metric.label === "Population in high-column zones")?.detail).toBe("NPWEI >= 60 urban population");
   });
 
   it("parses NO2 map metadata and builds the vector tile URL template", async () => {
@@ -290,6 +306,7 @@ describe("backend web_data client", () => {
       "http://backend.test/api/map/no2/grid/DJF/2024.json"
     ]);
   });
+
   it("shares cached and in-flight NO2 map requests for duplicate load targets", async () => {
     const requests: string[] = [];
     const fetcher: typeof fetch = async (url) => {
@@ -355,6 +372,7 @@ describe("backend web_data client", () => {
     expect(requests).toContain("http://backend.test/api/map/no2/grid/metadata");
     expect(result.data.features).toHaveLength(1);
   });
+
   it("starts grid fallback while tile probes are still pending", async () => {
     const requests: string[] = [];
     const slowTileUrl = "http://backend.test/api/map/no2/tiles/Annual/2024/4/7/7.mvt";
@@ -391,6 +409,23 @@ describe("backend web_data client", () => {
     releaseSlowProbe();
   });
 
+  it("stops with the unavailable-map error when the selected map year is unsupported", async () => {
+    const requests: string[] = [];
+    const fetcher: typeof fetch = async (url) => {
+      const requestUrl = String(url);
+      requests.push(requestUrl);
+      if (requestUrl.endsWith("/api/map/no2/metadata")) return responseFrom(sampleMapMetadata());
+      if (requestUrl.endsWith("/api/map/no2/grid/metadata")) return responseFrom(sampleGridMetadata());
+      throw new Error(`Unexpected request ${requestUrl}`);
+    };
+
+    await expect(loadNo2MapData(fetcher, "http://backend.test", "Annual", 2023, { retryDelayMs: 0 })).rejects.toThrow(
+      "Backend NO2 population grid is unavailable for 2023."
+    );
+    expect(requests).toEqual(["http://backend.test/api/map/no2/metadata", "http://backend.test/api/map/no2/grid/metadata"]);
+    expect(requests.some((request) => request.toLowerCase().includes("month"))).toBe(false);
+  });
+
   it("stops with a clear error after the NO2 map data retry budget is exhausted", async () => {
     let metadataAttempts = 0;
     const fetcher: typeof fetch = async () => {
@@ -406,6 +441,7 @@ describe("backend web_data client", () => {
 
   it("keeps the map implementation on backend grid or MVT sources instead of synthetic sample surfaces", () => {
     const source = readFileSync(join(process.cwd(), "src", "components", "TargetNpweiMap.tsx"), "utf-8");
+    const dashboardSource = readFileSync(join(process.cwd(), "src", "components", "DashboardView.tsx"), "utf-8");
     const mapExplorerSource = readFileSync(join(process.cwd(), "src", "components", "MapExplorer.tsx"), "utf-8");
     const webDataClientSource = readFileSync(join(process.cwd(), "src", "data", "webDataClient.ts"), "utf-8");
     const skeletonSource = readFileSync(join(process.cwd(), "src", "components", "Skeletons.tsx"), "utf-8");
@@ -414,6 +450,8 @@ describe("backend web_data client", () => {
     expect(source).toContain("MVTLayer");
     expect(source).toContain("GeoJsonLayer");
     expect(source).toContain("loadNo2MapData(fetch, apiBaseUrl, season, year)");
+    expect(source).not.toContain("void month");
+    expect(source).not.toContain("month:");
     expect(webDataClientSource).toContain("fetchNo2MapTileMetadata");
     expect(webDataClientSource).toContain("fetchNo2MapGridMetadata");
     expect(webDataClientSource).toContain("fetchNo2MapGridData");
@@ -443,6 +481,16 @@ describe("backend web_data client", () => {
     expect(source).toContain("basemaps.cartocdn.com");
     expect(mapExplorerSource).toContain('import { TargetNpweiMap } from "@/components/TargetNpweiMap";');
     expect(mapExplorerSource).toContain("<TargetNpweiMap");
+    expect(mapExplorerSource).not.toContain("Monthly map tiles unavailable");
+    expect(mapExplorerSource).not.toContain("target-map-disabled-control");
+    expect(mapExplorerSource).not.toContain("SelectedYearSummaryPanel");
+    expect(mapExplorerSource).not.toContain("Selected Year Summary");
+    expect(mapExplorerSource).not.toContain("buildSelectedYearSummary");
+    expect(mapExplorerSource).not.toContain("target-selected-year-summary");
+    expect(mapExplorerSource).not.toContain("setMonth");
+    expect(mapExplorerSource).not.toContain("max={12}");
+    expect(mapExplorerSource).not.toContain("month={");
+    expect(dashboardSource).not.toContain("month={");
     expect(mapExplorerSource).not.toContain("window.location.reload");
     expect(mapExplorerSource).not.toContain("sessionStorage");
     expect(mapExplorerSource).not.toContain("next/dynamic");
@@ -459,6 +507,19 @@ describe("backend web_data client", () => {
     expect(legacyMapSource).not.toContain("COUNTRY_LABELS");
   });
 
+  it("keeps map NO2 column labels on scaled display units", () => {
+    const source = readFileSync(join(process.cwd(), "src", "components", "TargetNpweiMap.tsx"), "utf-8");
+    const overviewTableSource = readFileSync(join(process.cwd(), "src", "components", "OverviewRankingTable.tsx"), "utf-8");
+    const rankingTableSource = readFileSync(join(process.cwd(), "src", "components", "RankingTable.tsx"), "utf-8");
+
+    expect(source).toContain("NO2_COLUMN_UNIT_LABEL");
+    expect(source).toContain("formatNo2ColumnHtml");
+    expect(source).toContain("pweToColumn(value).toFixed(2)");
+    expect(overviewTableSource).toContain("NO2_COLUMN_UNIT_LABEL");
+    expect(overviewTableSource).not.toContain("x10^15 molecules cm^-2");
+    expect(rankingTableSource).toContain("NO2_COLUMN_UNIT_LABEL");
+    expect(rankingTableSource).toContain("no2-unit-column");
+  });
 
   it("omits the selected-year summary row from the map explorer", () => {
     const mapExplorerSource = readFileSync(join(process.cwd(), "src", "components", "MapExplorer.tsx"), "utf-8");

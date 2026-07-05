@@ -2,7 +2,8 @@
 
 import { Download, FileJson, Printer } from "lucide-react";
 import type { Filters } from "@/types/exposure";
-import { NO2_COLUMN_UNIT, getCountryFeatureCollection, getCountryName, getOverviewMonthlyCycle } from "@/data/sampleData";
+import { getCountryFeatureCollection, getCountryName, getOverviewMonthlyCycle } from "@/data/sampleData";
+import { NO2_COLUMN_UNIT } from "@/data/webData";
 
 function downloadFile(filename: string, mimeType: string, contents: string) {
   const blob = new Blob([contents], { type: mimeType });

@@ -14,11 +14,11 @@ import type {
   SummaryMetric,
   TrendPoint
 } from "@/types/exposure";
+import { NO2_COLUMN_UNIT, NO2_COLUMN_UNIT_LABEL } from "@/data/webData";
 import westAfricaBoundary from "./westAfricaBoundary.json";
 
 export const YEARS = [2020, 2021, 2022, 2023, 2024, 2025];
-export const NO2_COLUMN_UNIT = "x10^15 molecules cm^-2";
-export const NO2_COLUMN_UNIT_LABEL = "×10¹⁵ molecules cm⁻²";
+export { NO2_COLUMN_UNIT, NO2_COLUMN_UNIT_LABEL };
 
 export const REGIONS = [
   { id: "west-africa", label: "West Africa", countryIds: [] },
@@ -719,17 +719,17 @@ export function getSummaryMetrics(filters: Filters): SummaryMetric[] {
   return [
     {
       label: "Mean NO2",
-      value: `${round(no2)} ppb`,
+      value: `${round(no2)}`,
       delta: round(no2 - prevNo2),
       tone: "cyan",
-      detail: "Monthly mean across selected geography"
+      detail: `Monthly mean (${NO2_COLUMN_UNIT_LABEL})`
     },
     {
       label: "Population exposure",
-      value: `${Math.round(exposure).toLocaleString()} M-ppb`,
+      value: `${Math.round(exposure).toLocaleString()} M`,
       delta: round((exposure - sum(previous.map((metric) => metric.populationExposure))) / 1000),
       tone: "lime",
-      detail: "Population weighted exposure index"
+      detail: `Population weighted column (${NO2_COLUMN_UNIT_LABEL})`
     },
     {
       label: "Fire activity",
@@ -743,7 +743,7 @@ export function getSummaryMetrics(filters: Filters): SummaryMetric[] {
       value: thresholdHits.toString(),
       delta: round(threshold),
       tone: "rose",
-      detail: `NO2 threshold ${round(threshold)} ppb`
+      detail: `NO2 threshold ${round(threshold)} ${NO2_COLUMN_UNIT_LABEL}`
     }
   ];
 }

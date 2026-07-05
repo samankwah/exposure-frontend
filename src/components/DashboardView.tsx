@@ -101,7 +101,7 @@ function OverviewMapCard({
         </div>
       </header>
       <div className="tropomi-map-body">
-        <TargetNpweiMap layerMode="no2" month={filters.month === "all" ? 12 : filters.month} rows={cityRows} season="Annual" year={filters.year} />
+        <TargetNpweiMap layerMode="no2" rows={cityRows} season="Annual" year={filters.year} />
       </div>
     </article>
   );
@@ -163,7 +163,6 @@ function SeasonalExposureCard({ cityRows, filters }: { cityRows: CityNpweiRow[];
       <div className="fire-mini-map target-fire-map" aria-label="Seasonal exposure mini map">
         <TargetNpweiMap
           layerMode="population"
-          month={3}
           rows={cityRows}
           season="DJF"
           year={filters.year}

@@ -10,6 +10,7 @@ import { ObservatoryFooter } from "@/components/ObservatoryFooter";
 import { RankingTable } from "@/components/RankingTable";
 import { useObservatoryFilters } from "@/components/ObservatoryContext";
 import type { Filters } from "@/types/exposure";
+import { NO2_COLUMN_UNIT_LABEL } from "@/data/webData";
 import {
   getAnnualTrend,
   getCountryName,
@@ -101,7 +102,7 @@ export function FireSeasonalityView() {
           secondaryKey="wet"
           secondaryLabel="Wet NO₂"
           title="Dry vs wet season NO₂"
-          unit=" ppb"
+          unit={` ${NO2_COLUMN_UNIT_LABEL}`}
         />
       </section>
       <ObservatoryFooter />
@@ -130,12 +131,12 @@ export function ReportsView() {
           <span className="eyebrow">Auto-generated summary</span>
           <h2>{getCountryName(filters.countryId)} NO₂ exposure briefing, {filters.year}</h2>
           <p>
-            Mean NO₂ is {metrics[0].value}, with {metrics[1].value} in population-weighted exposure and {metrics[2].value}
+            Mean NO₂ column is {metrics[0].value} {NO2_COLUMN_UNIT_LABEL}, with {metrics[1].value} in population-weighted exposure and {metrics[2].value}
             active fire detections in the selected sample window.
           </p>
           <p>
             The highest-ranked country in the current selection is {top?.name ?? "not available"}, with {top?.no2.toFixed(1) ?? "0"}
-            ppb average NO₂ and {top?.hotspotShare ?? 0}% of its sampled hotspots in the top quartile.
+            {" "}{NO2_COLUMN_UNIT_LABEL} average NO₂ column and {top?.hotspotShare ?? 0}% of its sampled hotspots in the top quartile.
           </p>
           <ul>
             <li>Hotspot thresholding uses the selected sample top quartile.</li>

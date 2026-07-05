@@ -872,6 +872,24 @@ a {
   text-transform: uppercase;
 }
 
+.table-head .no2-unit-column {
+  display: grid;
+  gap: 2px;
+}
+
+.table-head .no2-unit-column strong {
+  font: inherit;
+}
+
+.table-head .no2-unit-column small {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+  text-transform: none;
+}
+
 .country-cell {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
@@ -3043,7 +3061,7 @@ a {
 
 .home-header-inner {
   display: grid;
-  grid-template-columns: minmax(270px, 360px) minmax(390px, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 34px;
   align-items: center;
   min-height: 112px;
@@ -3056,6 +3074,9 @@ a {
 .home-logo {
   display: flex;
   align-items: center;
+  justify-self: start;
+  width: 100%;
+  max-width: 304px;
   min-width: 0;
 }
 
@@ -3072,6 +3093,7 @@ a {
   display: flex;
   align-items: stretch;
   justify-content: center;
+  justify-self: center;
   gap: 30px;
   min-width: 0;
 }
@@ -3113,6 +3135,7 @@ a {
 }
 
 .home-contact {
+  justify-self: end;
   min-height: 52px;
   border: 1px solid #e0e6ed;
   border-radius: 9px;
@@ -4098,7 +4121,7 @@ body.mobile-nav-open {
   }
 
   .home-header-inner {
-    grid-template-columns: 270px minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     gap: 22px;
   }
 
@@ -4191,8 +4214,12 @@ body.mobile-nav-open {
   }
 
   .home-logo img {
-    height: 68px;
-    width: 250px;
+    width: 100%;
+    height: auto;
+  }
+
+  .home-logo {
+    max-width: 210px;
   }
 
   .home-contact {
@@ -4518,7 +4545,7 @@ body.mobile-nav-open {
 
   .home-logo img {
     width: 100%;
-    max-width: 244px;
+    max-width: 210px;
     height: auto;
   }
 
@@ -6301,7 +6328,7 @@ button.map-ranking-row.active {
 
 .target-map-control-bar {
   display: grid;
-  grid-template-columns: 120px 120px 102px 1px 130px 130px minmax(0, 1fr) auto;
+  grid-template-columns: 120px 120px 102px 1px 130px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   min-height: 70px;
@@ -11463,8 +11490,12 @@ button.target-city-row.active {
   }
 
   .home-logo img {
-    width: min(214px, 100%);
+    width: 100%;
     height: auto;
+  }
+
+  .home-logo {
+    max-width: 190px;
   }
 
   .home-header-inner {

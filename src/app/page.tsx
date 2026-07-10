@@ -20,8 +20,6 @@ import {
   getOverviewMonthlyCycle,
   getWebDataObservationPeriod,
   getWebDataSummary,
-  getWebDataYearRange,
-  getWebDataYears,
   toNo2ColumnValue
 } from "@/data/webData";
 import { createPageMetadata } from "@/app/metadata";
@@ -39,8 +37,8 @@ type InsightVisualKind = "monthly" | "annual" | "ranking";
 
 const webDataSummary = getWebDataSummary();
 const annualHealthSummary = getHealthSeasonSummary("Annual");
-const coveredYears = Array.from(new Set([...webDataSummary.years_covered, ...getWebDataYears()])).sort((a, b) => a - b);
-const yearRange = coveredYears.length > 0 ? getWebDataYearRange() : "No generated years";
+const HOMEPAGE_OBSERVATION_YEAR_RANGE = "2020 - 2025";
+const yearRange = HOMEPAGE_OBSERVATION_YEAR_RANGE;
 const observationPeriod = getWebDataObservationPeriod();
 const urbanPopulationMillions = webDataSummary.total_urban_population / 1_000_000;
 
@@ -59,7 +57,6 @@ const cityRanking = getOverviewHotspots(DEFAULT_FILTERS)
 
 const insightCards: {
   date: string;
-  featured?: boolean;
   href: string;
   tags: string[];
   title: string;
@@ -70,8 +67,7 @@ const insightCards: {
     tags: ["Exposure", "Urban Hotspots", "NO₂", "West Africa"],
     date: "June 7, 2026",
     href: "/insights",
-    visual: "monthly",
-    featured: true
+    visual: "monthly"
   },
   {
     title: "Dry-season fire activity is amplifying exposure risk across key transport corridors",
@@ -190,7 +186,7 @@ export default function Home() {
 
           <div className="home-insight-grid">
             {insightCards.map((card) => (
-              <Link className={card.featured ? "home-insight-card featured" : "home-insight-card"} href={card.href} key={card.title}>
+              <Link className="home-insight-card" href={card.href} key={card.title}>
                 <div className={`home-insight-visual ${card.visual}`}>
                   <InsightVisual variant={card.visual} />
                 </div>

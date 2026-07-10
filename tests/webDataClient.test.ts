@@ -10,6 +10,8 @@ import {
   fetchNo2MapGridMetadata,
   fetchNo2MapTileMetadata,
   getApiBaseUrl,
+  getNo2MapDisplayLog10ExposureRange,
+  getNo2MapDisplaySeasonYearRanges,
   getNo2MapSeasonYearRanges,
   loadNo2MapData,
   loadWebDataSnapshot,
@@ -17,6 +19,12 @@ import {
   normalizeNo2MapTileMetadata,
   type No2MapGridMetadata
 } from "../src/data/webDataClient";
+import {
+  THEME_STORAGE_KEY,
+  readStoredTheme,
+  resolveInitialTheme,
+  writeStoredTheme
+} from "../src/components/ThemeProvider";
 import {
   DEFAULT_FILTERS,
   NO2_COLUMN_UNIT,
@@ -64,6 +72,14 @@ describe("backend web_data client", () => {
     delete process.env.NEXT_PUBLIC_API_BASE_URL;
     delete process.env.NEXT_PUBLIC_API_BASE;
     vi.stubGlobal("window", { location: { hostname: "no2exposure.netlify.app" } });
+
+    expect(getApiBaseUrl()).toBe("https://exposure-backend-eta.vercel.app");
+  });
+
+  it("defaults local previews to the deployed backend when no API env is configured", () => {
+    delete process.env.NEXT_PUBLIC_API_BASE_URL;
+    delete process.env.NEXT_PUBLIC_API_BASE;
+    vi.stubGlobal("window", { location: { hostname: "localhost" } });
 
     expect(getApiBaseUrl()).toBe("https://exposure-backend-eta.vercel.app");
   });
@@ -193,6 +209,135 @@ describe("backend web_data client", () => {
     expect(formatPwe(3_354_604_383_762_359)).toBe(`3.35 ${NO2_COLUMN_UNIT_LABEL}`);
   });
 
+  it("resolves the site theme from stored choice before system preference", () => {
+    expect(
+      resolveInitialTheme({
+        storage: storageReturning("night"),
+        matchMedia: mediaMatching(false)
+      })
+    ).toBe("night");
+    expect(
+      resolveInitialTheme({
+        storage: storageReturning("day"),
+        matchMedia: mediaMatching(true)
+      })
+    ).toBe("day");
+    expect(
+      resolveInitialTheme({
+        storage: storageReturning(null),
+        matchMedia: mediaMatching(true)
+      })
+    ).toBe("night");
+    expect(readStoredTheme(storageReturning("unexpected"))).toBeNull();
+  });
+
+  it("persists explicit site theme choices under the CLeNE storage key", () => {
+    const storage = { setItem: vi.fn() };
+
+    writeStoredTheme(storage, "night");
+
+    expect(storage.setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, "night");
+  });
+
+  it("keeps the root layout theme bootstrap in the pre-hydration path", () => {
+    const layoutSource = readFileSync(join(process.cwd(), "src", "app", "layout.tsx"), "utf-8");
+
+    expect(layoutSource).toContain("ThemeProvider");
+    expect(layoutSource).toContain("suppressHydrationWarning");
+    expect(layoutSource).toContain("clene-theme");
+    expect(layoutSource).toContain("prefers-color-scheme: dark");
+    expect(layoutSource).toContain("document.documentElement.dataset.theme");
+    expect(layoutSource).toContain("document.documentElement.style.colorScheme");
+  });
+
+  it("adds the day-night toggle to the desktop navbar and mobile drawer actions", () => {
+    const navbarSource = readFileSync(join(process.cwd(), "src", "components", "BrandedNavbar.tsx"), "utf-8");
+    const toggleSource = readFileSync(join(process.cwd(), "src", "components", "ThemeToggle.tsx"), "utf-8");
+
+    expect(navbarSource).toContain('import { ThemeToggle } from "@/components/ThemeToggle";');
+    expect(navbarSource).toContain('className="home-theme-toggle"');
+    expect(navbarSource).toContain('className="mobile-nav-theme-toggle"');
+    expect(toggleSource).toContain("Sun");
+    expect(toggleSource).toContain("Moon");
+    expect(toggleSource).toContain("toggleTheme");
+    expect(toggleSource).toContain('<span className="sr-only">Toggle color theme</span>');
+  });
+
+  it("covers page-specific surfaces and chart canvases in night mode", () => {
+    const cssSource = readFileSync(join(process.cwd(), "src", "app", "globals.css"), "utf-8");
+    const chartSource = readFileSync(join(process.cwd(), "src", "components", "Charts.tsx"), "utf-8");
+    const citiesSource = readFileSync(join(process.cwd(), "src", "components", "CitiesPage.tsx"), "utf-8");
+    const healthSource = readFileSync(join(process.cwd(), "src", "components", "HealthPage.tsx"), "utf-8");
+
+    expect(cssSource).toContain('html[data-theme="night"] :where(');
+    for (const selector of [
+      ".home-page",
+      ".branded-data-page",
+      ".insights-detail-page",
+      ".health-page",
+      ".cities-page",
+      ".trends-page",
+      ".about-page",
+      ".contact-page"
+    ]) {
+      expect(cssSource).toContain(selector);
+    }
+
+    expect(chartSource).toContain("useChartColors");
+    expect(chartSource).toContain("chartColorThemes");
+    expect(chartSource).toContain("gridSoft");
+    expect(citiesSource).toContain('resolvedTheme === "night"');
+    expect(healthSource).toContain('resolvedTheme === "night"');
+  });
+
+  it("keeps Health night surfaces, shared shell spacing, and city pagination guarded", () => {
+    const cssSource = readFileSync(join(process.cwd(), "src", "app", "globals.css"), "utf-8");
+    const healthSource = readFileSync(join(process.cwd(), "src", "components", "HealthPage.tsx"), "utf-8");
+    const healthNightOverrideStart = cssSource.indexOf("/* Final Health night-mode surface hardening. */");
+    const shellSpacingStart = cssSource.indexOf("/* Shared branded shell bottom spacing");
+    const healthNightOverrideSource = cssSource.slice(healthNightOverrideStart);
+    const shellSpacingSource = cssSource.slice(shellSpacingStart);
+
+    expect(healthNightOverrideStart).toBeGreaterThan(-1);
+    expect(shellSpacingStart).toBeGreaterThan(-1);
+    expect(healthNightOverrideSource).toContain('html[data-theme="night"] .health-page .health-hero');
+    expect(healthNightOverrideSource).toContain('html[data-theme="night"] .health-page .city-exposure-section');
+    expect(healthNightOverrideSource).toContain("var(--theme-surface)");
+    expect(healthNightOverrideSource).toContain("var(--theme-surface-soft)");
+    expect(healthNightOverrideSource).toContain("var(--theme-line)");
+    expect(healthNightOverrideSource).toContain("var(--theme-text)");
+    expect(healthNightOverrideSource).toContain("var(--theme-muted)");
+    expect(healthNightOverrideSource).toContain(".health-page .health-kpi-card svg");
+    expect(cssSource).toContain("--health-red: #fb7185");
+    expect(cssSource).not.toContain("color-mix(in srgb, var(--health-accent) 12%");
+
+    for (const selector of [
+      ".data-page-shell",
+      ".branded-map-page .data-page-shell",
+      ".health-page .health-dashboard-shell",
+      ".cities-page .cities-dashboard-shell",
+      ".trends-dashboard-shell",
+      ".about-dashboard-shell",
+      ".contact-dashboard-shell",
+      ".insights-detail-shell"
+    ]) {
+      expect(shellSpacingSource).toContain(selector);
+    }
+    expect(shellSpacingSource).toContain("padding-bottom: 72px;");
+    expect(shellSpacingSource).toContain("padding-bottom: 24px;");
+
+    expect(healthSource).toContain("CITY_EXPOSURE_PAGE_SIZE = 16");
+    expect(healthSource).toContain("const [currentPage, setCurrentPage] = useState(1);");
+    expect(healthSource).toContain("rows.slice(pageStart, pageEnd)");
+    expect(healthSource).toContain("getCityExposurePageItems(currentPage, totalPages)");
+    expect(healthSource).toContain('className="city-exposure-pagination-controls"');
+    expect(healthSource).toContain('aria-current={item === currentPage ? "page" : undefined}');
+    expect(healthSource).toContain("Go to first city exposure page");
+    expect(healthSource).toContain("Go to previous city exposure page");
+    expect(healthSource).toContain("Go to next city exposure page");
+    expect(healthSource).toContain("Go to last city exposure page");
+  });
+
   it("labels dashboard NO2 summary metrics with scaled column units", () => {
     const metrics = getOverviewSummaryMetrics(DEFAULT_FILTERS);
 
@@ -209,6 +354,7 @@ describe("backend web_data client", () => {
     expect(metadata.valueField).toBe("log10_pixel_exposure");
     expect(metadata.log10PixelExposure).toEqual({ min: 18.2, max: 20.4 });
     expect(getNo2MapSeasonYearRanges(metadata, "DJF", 2024)?.log10PixelExposure).toEqual({ min: 19.1, max: 20.1 });
+    expect(getNo2MapDisplaySeasonYearRanges(metadata, "DJF", 2024)?.log10PixelExposure).toEqual({ min: 18.6, max: 20.4 });
     expect(getNo2MapSeasonYearRanges(metadata, "JJA", 2024)?.log10PixelExposure).toEqual({ min: 18.5, max: 19.4 });
     expect(buildNo2TileUrlTemplate(metadata, "Annual", 2024, "http://backend.test")).toBe(
       "http://backend.test/api/map/no2/tiles/Annual/2024/{z}/{x}/{y}.mvt"
@@ -216,6 +362,39 @@ describe("backend web_data client", () => {
     expect(buildNo2TileUrlTemplate(metadata, "DJF", 2024, "http://backend.test")).toBe(
       "http://backend.test/api/map/no2/tiles/DJF/2024/{z}/{x}/{y}.mvt"
     );
+  });
+
+  it("uses clipped grid NO2 map ranges between display season-year and raw ranges", () => {
+    const metadata = normalizeNo2MapTileMetadata(sampleMapMetadata());
+    const withoutSeasonDisplay = normalizeNo2MapTileMetadata({ ...sampleMapMetadata(), displayRangesBySeasonYear: {} });
+    const withoutDisplayRanges = normalizeNo2MapTileMetadata({
+      ...sampleMapMetadata(),
+      displayLog10PixelExposure: undefined,
+      displayRangesBySeasonYear: undefined
+    });
+    const rawWideGridMetadata = normalizeNo2MapGridMetadata({
+      ...sampleGridMetadata(),
+      log10PixelExposure: { min: 18.4, max: 22.4 },
+      rangesBySeasonYear: {
+        DJF: {
+          "2024": {
+            no2Column: { min: 1.0e15, max: 6.0e15 },
+            populationCount: { min: 120, max: 64000 },
+            pixelExposure: { min: 1.0e18, max: 2.5e22 },
+            log10PixelExposure: { min: 18.4, max: 22.4 }
+          }
+        }
+      }
+    });
+    const clippedRange = { min: 18.6, max: 20.4 };
+
+    expect(getNo2MapDisplayLog10ExposureRange(metadata, "Annual", 2024, clippedRange)).toEqual({ min: 18.7, max: 20.2 });
+    expect(getNo2MapDisplayLog10ExposureRange(withoutSeasonDisplay, "Annual", 2024, clippedRange)).toEqual(clippedRange);
+    expect(getNo2MapDisplayLog10ExposureRange(withoutSeasonDisplay, "Annual", 2024)).toEqual({ min: 18.6, max: 20.2 });
+    expect(getNo2MapDisplayLog10ExposureRange(withoutDisplayRanges, "DJF", 2024, clippedRange)).toEqual(clippedRange);
+    expect(getNo2MapDisplayLog10ExposureRange(withoutDisplayRanges, "DJF", 2024)).toEqual({ min: 19.1, max: 20.1 });
+    expect(getNo2MapDisplayLog10ExposureRange(rawWideGridMetadata, "DJF", 2024, clippedRange)).toEqual(clippedRange);
+    expect(getNo2MapDisplayLog10ExposureRange(rawWideGridMetadata, "DJF", 2024)).toEqual({ min: 18.4, max: 22.4 });
   });
 
   it("normalizes null NO2 map season-year definition as omitted", () => {
@@ -270,8 +449,6 @@ describe("backend web_data client", () => {
       const requestUrl = String(url);
       requests.push(requestUrl);
       if (requestUrl.endsWith("/api/map/no2/metadata")) return responseFrom(sampleMapMetadata());
-      if (requestUrl.endsWith("/api/map/no2/grid/metadata")) return responseFrom(sampleGridMetadata());
-      if (requestUrl.endsWith("/api/map/no2/grid/Annual/2024.json")) return responseFrom(sampleGridFeatureCollection());
       if (requestUrl.includes("/api/map/no2/tiles/Annual/2024/4/")) return responseFrom(null);
       throw new Error(`Unexpected request ${requestUrl}`);
     };
@@ -282,6 +459,7 @@ describe("backend web_data client", () => {
     expect(result.metadata.layerName).toBe("no2_pixels");
     expect(requests[0]).toBe("http://backend.test/api/map/no2/metadata");
     expect(requests.some((request) => request.includes("/api/map/no2/tiles/Annual/2024/4/"))).toBe(true);
+    expect(requests.some((request) => request.includes("/api/map/no2/grid/"))).toBe(false);
     expect(requests.some((request) => request.includes("/api/map/no2/ti/"))).toBe(false);
   });
 
@@ -332,25 +510,28 @@ describe("backend web_data client", () => {
     expect(requests.filter((request) => request.endsWith("/api/map/no2/grid/DJF/2024.json"))).toHaveLength(1);
   });
 
-  it("retries transient metadata fetch failures and succeeds without a page refresh", async () => {
-    let metadataAttempts = 0;
+  it("retries transient grid metadata fetch failures and succeeds without a page refresh", async () => {
+    let gridMetadataAttempts = 0;
+    const requests: string[] = [];
     const fetcher: typeof fetch = async (url) => {
       const requestUrl = String(url);
-      if (requestUrl.endsWith("/api/map/no2/metadata")) {
-        metadataAttempts += 1;
-        if (metadataAttempts < 3) throw new Error("NO2 tile metadata is warming up");
-        return responseFrom(sampleMapMetadata());
+      requests.push(requestUrl);
+      if (requestUrl.endsWith("/api/map/no2/metadata")) return responseFrom(null, { status: 204 });
+      if (requestUrl.endsWith("/api/map/no2/grid/metadata")) {
+        gridMetadataAttempts += 1;
+        if (gridMetadataAttempts < 3) throw new Error("NO2 grid metadata is warming up");
+        return responseFrom(sampleGridMetadata());
       }
-      if (requestUrl.endsWith("/api/map/no2/grid/metadata")) return responseFrom(sampleGridMetadata());
       if (requestUrl.endsWith("/api/map/no2/grid/Annual/2024.json")) return responseFrom(sampleGridFeatureCollection());
-      if (requestUrl.includes("/api/map/no2/tiles/Annual/2024/4/")) return responseFrom(null);
       throw new Error(`Unexpected request ${requestUrl}`);
     };
 
     const result = await loadNo2MapData(fetcher, "http://backend.test", "Annual", 2024, { retryDelayMs: 0 });
 
-    expect(result.source).toBe("tile");
-    expect(metadataAttempts).toBe(3);
+    expect(result.source).toBe("grid");
+    expect(gridMetadataAttempts).toBe(3);
+    expect(requests.filter((request) => request.endsWith("/api/map/no2/metadata"))).toHaveLength(3);
+    expect(requests).toContain("http://backend.test/api/map/no2/grid/Annual/2024.json");
   });
 
   it("falls back to grid source when initial NO2 tile coverage is incomplete", async () => {
@@ -373,7 +554,29 @@ describe("backend web_data client", () => {
     expect(result.data.features).toHaveLength(1);
   });
 
-  it("starts grid fallback while tile probes are still pending", async () => {
+  it("falls back to grid source when optional NO2 tile metadata fetches fail", async () => {
+    const requests: string[] = [];
+    const fetcher: typeof fetch = async (url) => {
+      const requestUrl = String(url);
+      requests.push(requestUrl);
+      if (requestUrl.endsWith("/api/map/no2/metadata")) throw new TypeError("Failed to fetch");
+      if (requestUrl.endsWith("/api/map/no2/grid/metadata")) return responseFrom(sampleGridMetadata());
+      if (requestUrl.endsWith("/api/map/no2/grid/Annual/2024.json")) return responseFrom(sampleGridFeatureCollection());
+      throw new Error(`Unexpected request ${requestUrl}`);
+    };
+
+    const result = await loadNo2MapData(fetcher, "http://backend.test", "Annual", 2024, { retryDelayMs: 0 });
+
+    if (result.source !== "grid") throw new Error(`Expected grid source, received ${result.source}`);
+    expect(requests).toEqual([
+      "http://backend.test/api/map/no2/metadata",
+      "http://backend.test/api/map/no2/grid/metadata",
+      "http://backend.test/api/map/no2/grid/Annual/2024.json"
+    ]);
+    expect(result.data.features).toHaveLength(1);
+  });
+
+  it("starts grid fallback only after a tile probe confirms missing coverage", async () => {
     const requests: string[] = [];
     const slowTileUrl = "http://backend.test/api/map/no2/tiles/Annual/2024/4/7/7.mvt";
     const incompleteTileUrl = "http://backend.test/api/map/no2/tiles/Annual/2024/4/8/7.mvt";
@@ -404,7 +607,7 @@ describe("backend web_data client", () => {
     expect(slowProbeResolved).toBe(false);
     expect(requests).toContain(slowTileUrl);
     expect(requests).toContain(incompleteTileUrl);
-    expect(requests.indexOf("http://backend.test/api/map/no2/grid/metadata")).toBeLessThan(requests.indexOf(slowTileUrl));
+    expect(requests.indexOf("http://backend.test/api/map/no2/grid/metadata")).toBeGreaterThan(requests.indexOf(incompleteTileUrl));
 
     releaseSlowProbe();
   });
@@ -427,16 +630,21 @@ describe("backend web_data client", () => {
   });
 
   it("stops with a clear error after the NO2 map data retry budget is exhausted", async () => {
-    let metadataAttempts = 0;
-    const fetcher: typeof fetch = async () => {
-      metadataAttempts += 1;
-      throw new Error("NO2 tile metadata is still unavailable");
+    let gridMetadataAttempts = 0;
+    const fetcher: typeof fetch = async (url) => {
+      const requestUrl = String(url);
+      if (requestUrl.endsWith("/api/map/no2/metadata")) throw new Error("NO2 tile metadata is still unavailable");
+      if (requestUrl.endsWith("/api/map/no2/grid/metadata")) {
+        gridMetadataAttempts += 1;
+        throw new Error("NO2 grid metadata is still unavailable");
+      }
+      throw new Error(`Unexpected request ${requestUrl}`);
     };
 
     await expect(loadNo2MapData(fetcher, "http://backend.test", "Annual", 2024, { retries: 1, retryDelayMs: 0 })).rejects.toThrow(
-      "NO2 tile metadata is still unavailable"
+      "NO2 grid metadata is still unavailable"
     );
-    expect(metadataAttempts).toBe(2);
+    expect(gridMetadataAttempts).toBe(2);
   });
 
   it("keeps the map implementation on backend grid or MVT sources instead of synthetic sample surfaces", () => {
@@ -458,6 +666,15 @@ describe("backend web_data client", () => {
     expect(webDataClientSource).toContain("DEFAULT_NO2_MAP_DATA_RETRIES = 2");
     expect(webDataClientSource).toContain("NO2_MAP_TILE_PREFLIGHT_LIMIT");
     expect(source).toContain("getNo2MapSeasonYearRanges(metadata, season, year)");
+    expect(source).toContain("const clippedLog10ExposureRange = useMemo(() => {");
+    expect(source).toContain('"log10_pixel_exposure"');
+    expect(source).toContain("const log10ExposureColorRange = getNo2MapDisplayLog10ExposureRange(");
+    expect(source).toContain('mapDataState.source === "grid" ? clippedLog10ExposureRange : null');
+    expect(source).toContain("log10ExposureRange={log10ExposureColorRange}");
+    expect(webDataClientSource).toContain("getNo2MapDisplaySeasonYearRanges(metadata, season, year)?.log10PixelExposure");
+    expect(webDataClientSource).toContain("clippedLog10ExposureRange ??");
+    expect(webDataClientSource).toContain("metadata.displayLog10PixelExposure ??");
+    expect(webDataClientSource).toContain("getNo2MapSeasonYearRanges(metadata, season, year)?.log10PixelExposure ??");
     expect(source).toContain("html: getTooltipHtml(properties, metadata, rows)");
     expect(source).toContain('className: "target-map-tooltip"');
     expect(source).toContain("NO₂ column");
@@ -468,6 +685,20 @@ describe("backend web_data client", () => {
     expect(source).not.toContain("log10(pixel_exposure)");
     expect(source).toContain("PWE = NO2 x Population, Log Scale");
     expect(source).toContain('"background-color": "#ffffff"');
+    expect(source).toContain('opacity: layerMode === "population" ? 0.76 : 0.94');
+    expect(source).toContain('opacity: layerMode === "population" ? 0.72 : 0.96');
+    expect(source).toContain("getLogExposureColor(Number(properties.log10_pixel_exposure ?? 0), log10ExposureRange, 226)");
+    expect(source).toContain('className="target-map-legend-end target-map-legend-low"');
+    expect(source).toContain('className="target-map-legend-end target-map-legend-high"');
+    expect(source).toContain('className="target-map-legend-value target-map-legend-min"');
+    expect(source).toContain('className="target-map-legend-value target-map-legend-mid"');
+    expect(source).toContain('className="target-map-legend-value target-map-legend-max"');
+    expect(source).not.toContain("getLegendTicks(range, layerMode)");
+    expect(source).toContain("DAY_MAP_STYLE");
+    expect(source).toContain("NIGHT_MAP_STYLE");
+    expect(source).toContain("light_all/{z}/{x}/{y}.png");
+    expect(source).toContain("dark_all/{z}/{x}/{y}.png");
+    expect(source).toContain('resolvedTheme === "night" ? NIGHT_MAP_STYLE : DAY_MAP_STYLE');
     expect(source).not.toContain("local-country-context-fill");
     expect(source).not.toContain("local-country-labels");
     expect(source).not.toContain("COUNTRY_LABELS");
@@ -479,7 +710,9 @@ describe("backend web_data client", () => {
     expect(source).not.toContain("SUPPLEMENTAL_EXPOSURE_SOURCES");
     expect(source).not.toContain("@/data/sampleData");
     expect(source).toContain("basemaps.cartocdn.com");
-    expect(mapExplorerSource).toContain('import { TargetNpweiMap } from "@/components/TargetNpweiMap";');
+    expect(mapExplorerSource).toContain('import dynamic from "next/dynamic";');
+    expect(mapExplorerSource).toContain('import type { TargetNpweiMapProps } from "@/components/TargetNpweiMap";');
+    expect(mapExplorerSource).toContain('() => import("@/components/TargetNpweiMap").then((module) => module.TargetNpweiMap)');
     expect(mapExplorerSource).toContain("<TargetNpweiMap");
     expect(mapExplorerSource).not.toContain("Monthly map tiles unavailable");
     expect(mapExplorerSource).not.toContain("target-map-disabled-control");
@@ -491,9 +724,10 @@ describe("backend web_data client", () => {
     expect(mapExplorerSource).not.toContain("max={12}");
     expect(mapExplorerSource).not.toContain("month={");
     expect(dashboardSource).not.toContain("month={");
+    expect(dashboardSource).toContain('import dynamic from "next/dynamic";');
     expect(mapExplorerSource).not.toContain("window.location.reload");
     expect(mapExplorerSource).not.toContain("sessionStorage");
-    expect(mapExplorerSource).not.toContain("next/dynamic");
+    expect(mapExplorerSource).not.toContain('import { TargetNpweiMap } from "@/components/TargetNpweiMap";');
     expect(mapExplorerSource).not.toContain("dynamic<DeferredTargetMapProps>");
     expect(mapExplorerSource).not.toContain("TARGET_MAP_CHUNK_RELOAD_KEY");
     expect(skeletonSource).toContain("skeleton-map-panel");
@@ -585,6 +819,16 @@ describe("backend web_data client", () => {
     expect(homeSource).not.toContain("@/data/sampleData");
   });
 
+  it("shows the homepage observation year range as 2020 - 2025 without changing population baseline copy", () => {
+    const homeSource = readFileSync(join(process.cwd(), "src", "app", "page.tsx"), "utf-8");
+
+    expect(homeSource).toContain('const HOMEPAGE_OBSERVATION_YEAR_RANGE = "2020 - 2025";');
+    expect(homeSource).toContain('value: yearRange, label: "TROPOMI Observations"');
+    expect(homeSource).toContain("{yearRange} exposure trend");
+    expect(homeSource).toContain("NASA Gridded 2020 population raster");
+    expect(homeSource).not.toContain('const HOMEPAGE_OBSERVATION_YEAR_RANGE = "2020-2025";');
+  });
+
 });
 
 function cloneLocalSnapshot(): WebDataSnapshot {
@@ -622,6 +866,7 @@ function sampleMapMetadata() {
     populationCount: { min: 120, max: 64000 },
     pixelExposure: { min: 1.0e18, max: 2.5e20 },
     log10PixelExposure: { min: 18.2, max: 20.4 },
+    displayLog10PixelExposure: { min: 18.6, max: 20.2, p02: 18.6, p98: 20.2 },
     rangesBySeasonYear: {
       Annual: {
         "2024": {
@@ -645,6 +890,23 @@ function sampleMapMetadata() {
           populationCount: { min: 120, max: 64000 },
           pixelExposure: { min: 3.0e18, max: 2.5e19 },
           log10PixelExposure: { min: 18.5, max: 19.4 }
+        }
+      }
+    },
+    displayRangesBySeasonYear: {
+      Annual: {
+        "2024": {
+          log10PixelExposure: { min: 18.7, max: 20.2, p02: 18.7, p98: 20.2 }
+        }
+      },
+      DJF: {
+        "2024": {
+          log10PixelExposure: { min: 18.6, max: 20.4, p02: 18.6, p98: 20.4 }
+        }
+      },
+      JJA: {
+        "2024": {
+          log10PixelExposure: { min: 18.5, max: 20.1, p02: 18.5, p98: 20.1 }
         }
       }
     },
@@ -687,6 +949,16 @@ function sampleGridFeatureCollection() {
     type: "FeatureCollection",
     features: [{ type: "Feature", properties: { log10_pixel_exposure: 19 }, geometry: null }]
   };
+}
+
+function storageReturning(value: string | null) {
+  return {
+    getItem: vi.fn(() => value)
+  };
+}
+
+function mediaMatching(matches: boolean) {
+  return vi.fn(() => ({ matches }));
 }
 
 function extractTextLayerProps(source: string): string[] {

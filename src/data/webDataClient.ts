@@ -11,8 +11,8 @@ import {
   normalizeWebDataSnapshot
 } from "@/data/webData";
 
-export const DEFAULT_API_BASE_URL = "http://localhost:8000";
 export const PRODUCTION_API_BASE_URL = "https://exposure-backend-eta.vercel.app";
+export const DEFAULT_API_BASE_URL = PRODUCTION_API_BASE_URL;
 
 const PRODUCTION_FRONTEND_HOSTNAMES = new Set(["no2exposure.netlify.app"]);
 
@@ -38,6 +38,10 @@ export type No2MapValueRanges = {
   log10PixelExposure: NumericRange;
 };
 
+export type No2MapDisplayValueRanges = {
+  log10PixelExposure: NumericRange;
+};
+
 export type No2MapTileMetadata = {
   availableYears: number[];
   availableSeasons: WebDataSeason[];
@@ -52,6 +56,8 @@ export type No2MapTileMetadata = {
   pixelExposure: NumericRange;
   log10PixelExposure: NumericRange;
   rangesBySeasonYear?: Partial<Record<WebDataSeason, Record<string, No2MapValueRanges>>>;
+  displayLog10PixelExposure?: NumericRange;
+  displayRangesBySeasonYear?: Partial<Record<WebDataSeason, Record<string, No2MapDisplayValueRanges>>>;
   units: {
     no2Column: string;
     populationCount: string;
@@ -92,7 +98,7 @@ export type WebDataLoadResult = {
 
 const DEFAULT_NO2_MAP_DATA_RETRIES = 2;
 const DEFAULT_NO2_MAP_DATA_RETRY_DELAY_MS = 400;
-const NO2_MAP_TILE_PREFLIGHT_LIMIT = 24;
+const NO2_MAP_TILE_PREFLIGHT_LIMIT = 4;
 const no2MapDataLoadCache = new Map<string, Promise<No2MapDataLoadResult>>();
 const no2TileMetadataRequestCache = new Map<string, Promise<No2MapTileMetadata>>();
 const no2GridMetadataRequestCache = new Map<string, Promise<No2MapGridMetadata>>();
@@ -144,7 +150,7 @@ export async function fetchNo2MapTileMetadata(
   apiBaseUrl: string = getApiBaseUrl()
 ): Promise<No2MapTileMetadata> {
   const response = await fetcher(`${apiBaseUrl}/api/map/no2/metadata`, {
-    cache: "no-store",
+    cache: "force-cache",
     headers: {
       Accept: "application/json"
     }
@@ -165,7 +171,7 @@ export async function fetchNo2MapGridMetadata(
   apiBaseUrl: string = getApiBaseUrl()
 ): Promise<No2MapGridMetadata> {
   const response = await fetcher(`${apiBaseUrl}/api/map/no2/grid/metadata`, {
-    cache: "no-store",
+    cache: "force-cache",
     headers: {
       Accept: "application/json"
     }
@@ -316,6 +322,29 @@ export function getNo2MapSeasonYearRanges(
   return metadata.rangesBySeasonYear?.[season]?.[String(year)] ?? null;
 }
 
+export function getNo2MapDisplaySeasonYearRanges(
+  metadata: No2MapTileMetadata | No2MapGridMetadata,
+  season: WebDataSeason,
+  year: number
+): No2MapDisplayValueRanges | null {
+  return metadata.displayRangesBySeasonYear?.[season]?.[String(year)] ?? null;
+}
+
+export function getNo2MapDisplayLog10ExposureRange(
+  metadata: No2MapTileMetadata | No2MapGridMetadata,
+  season: WebDataSeason,
+  year: number,
+  clippedLog10ExposureRange?: NumericRange | null
+): NumericRange {
+  return (
+    getNo2MapDisplaySeasonYearRanges(metadata, season, year)?.log10PixelExposure ??
+    clippedLog10ExposureRange ??
+    metadata.displayLog10PixelExposure ??
+    getNo2MapSeasonYearRanges(metadata, season, year)?.log10PixelExposure ??
+    metadata.log10PixelExposure
+  );
+}
+
 async function loadNo2MapDataOnce(
   fetcher: typeof fetch,
   apiBaseUrl: string,
@@ -349,11 +378,10 @@ async function fetchSupportedNo2MapTileMetadata(
   try {
     const metadata = await fetchCachedNo2MapTileMetadata(fetcher, apiBaseUrl, season, year);
     if (!metadata.availableSeasons.includes(season) || !metadata.availableYears.includes(year)) return null;
-    const gridFallback = settleNo2MapGridFallback(loadNo2MapGridFallback(fetcher, apiBaseUrl, season, year));
     if (await hasNo2MapInitialTileCoverage(fetcher, metadata, season, year, apiBaseUrl)) return metadata;
-    await unwrapSettledNo2MapGridFallback(gridFallback);
-  } catch (error) {
-    if (!isNo2MapTileUnavailableError(error)) throw error;
+  } catch {
+    // MVT tiles are an optimization. If that optional path is absent or flaky,
+    // keep the map alive with the backend grid cache.
   }
 
   return null;
@@ -367,7 +395,7 @@ async function hasNo2MapInitialTileCoverage(
   apiBaseUrl: string
 ) {
   const urls = buildNo2InitialTileProbeUrls(metadata, season, year, apiBaseUrl);
-  if (urls.length === 0) return false;
+  if (urls.length === 0) return true;
 
   return new Promise<boolean>((resolve, reject) => {
     let remaining = urls.length;
@@ -434,13 +462,18 @@ function buildNo2InitialTileProbeUrls(
   const minY = latToTileY(north, zoom);
   const maxY = latToTileY(south, zoom);
   const tileCount = (maxX - minX + 1) * (maxY - minY + 1);
-  if (tileCount <= 0 || tileCount > NO2_MAP_TILE_PREFLIGHT_LIMIT) return [];
+  if (tileCount <= 0) return [];
 
   const template = buildNo2TileUrlTemplate(metadata, season, year, apiBaseUrl);
   const urls: string[] = [];
-  for (let x = minX; x <= maxX; x += 1) {
-    for (let y = minY; y <= maxY; y += 1) {
-      urls.push(template.replace("{z}", String(zoom)).replace("{x}", String(x)).replace("{y}", String(y)));
+  const step = Math.max(1, Math.ceil(tileCount / NO2_MAP_TILE_PREFLIGHT_LIMIT));
+  let index = 0;
+  for (let x = minX; x <= maxX && urls.length < NO2_MAP_TILE_PREFLIGHT_LIMIT; x += 1) {
+    for (let y = minY; y <= maxY && urls.length < NO2_MAP_TILE_PREFLIGHT_LIMIT; y += 1) {
+      if (index % step === 0) {
+        urls.push(template.replace("{z}", String(zoom)).replace("{x}", String(x)).replace("{y}", String(y)));
+      }
+      index += 1;
     }
   }
   return urls;
@@ -527,25 +560,8 @@ function fetchCachedNo2MapGridData(
   return request;
 }
 
-function settleNo2MapGridFallback(promise: Promise<No2MapDataLoadResult>) {
-  return promise.then(
-    (value) => ({ status: "fulfilled" as const, value }),
-    (reason: unknown) => ({ status: "rejected" as const, reason })
-  );
-}
-
-async function unwrapSettledNo2MapGridFallback(promise: ReturnType<typeof settleNo2MapGridFallback>) {
-  const result = await promise;
-  if (result.status === "rejected") throw result.reason;
-  return result.value;
-}
-
 function getNo2MapDataCacheKey(apiBaseUrl: string, season: WebDataSeason, year: number) {
   return `${apiBaseUrl.replace(/\/+$/, "")}|${season}|${year}`;
-}
-
-function isNo2MapTileUnavailableError(error: unknown) {
-  return error instanceof Error && error.message === "NO2 map tiles are unavailable";
 }
 
 function isRetryableNo2MapDataError(error: unknown) {
@@ -596,6 +612,9 @@ function normalizeNo2MapMetadataCommon(body: Record<string, unknown>) {
     pixelExposure: asRange(body.pixelExposure, "pixelExposure"),
     log10PixelExposure: asRange(body.log10PixelExposure, "log10PixelExposure"),
     rangesBySeasonYear: asOptionalRangesBySeasonYear(body.rangesBySeasonYear),
+    displayLog10PixelExposure:
+      body.displayLog10PixelExposure === undefined ? undefined : asRange(body.displayLog10PixelExposure, "displayLog10PixelExposure"),
+    displayRangesBySeasonYear: asOptionalDisplayRangesBySeasonYear(body.displayRangesBySeasonYear),
     units: {
       no2Column: asString(asRecord(body.units, "units").no2Column, "units.no2Column"),
       populationCount: asString(asRecord(body.units, "units").populationCount, "units.populationCount"),
@@ -630,12 +649,40 @@ function asOptionalRangesBySeasonYear(value: unknown): Partial<Record<WebDataSea
   return output;
 }
 
+function asOptionalDisplayRangesBySeasonYear(
+  value: unknown
+): Partial<Record<WebDataSeason, Record<string, No2MapDisplayValueRanges>>> | undefined {
+  if (value === undefined) return undefined;
+  const record = asRecord(value, "displayRangesBySeasonYear");
+  const output: Partial<Record<WebDataSeason, Record<string, No2MapDisplayValueRanges>>> = {};
+
+  for (const [season, years] of Object.entries(record)) {
+    if (season !== "Annual" && season !== "DJF" && season !== "JJA") {
+      throw new Error("NO2 map metadata displayRangesBySeasonYear contains an unsupported season");
+    }
+    const yearRanges = asRecord(years, `displayRangesBySeasonYear.${season}`);
+    output[season] = {};
+    for (const [year, ranges] of Object.entries(yearRanges)) {
+      output[season]![year] = asDisplayValueRanges(ranges, `displayRangesBySeasonYear.${season}.${year}`);
+    }
+  }
+
+  return output;
+}
+
 function asValueRanges(value: unknown, field: string): No2MapValueRanges {
   const record = asRecord(value, field);
   return {
     no2Column: asRange(record.no2Column, `${field}.no2Column`),
     populationCount: asRange(record.populationCount, `${field}.populationCount`),
     pixelExposure: asRange(record.pixelExposure, `${field}.pixelExposure`),
+    log10PixelExposure: asRange(record.log10PixelExposure, `${field}.log10PixelExposure`)
+  };
+}
+
+function asDisplayValueRanges(value: unknown, field: string): No2MapDisplayValueRanges {
+  const record = asRecord(value, field);
+  return {
     log10PixelExposure: asRange(record.log10PixelExposure, `${field}.log10PixelExposure`)
   };
 }

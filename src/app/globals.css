@@ -1,6 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;500;600;700;800&display=swap");
 
 :root {
+  color-scheme: light;
   --font-sans: "Space Grotesk", Arial, Helvetica, sans-serif;
   --font-mono: "DM Mono", Consolas, "Courier New", monospace;
   --navy: #0b1f2e;
@@ -21,6 +22,27 @@
   --rose: #c6473d;
   --shadow: 0 14px 38px rgba(31, 57, 72, 0.12);
   --site-content-max: 1690px;
+}
+
+html[data-theme="night"] {
+  color-scheme: dark;
+  --navy: #071827;
+  --navy-2: #0c2335;
+  --rail: #0b1f31;
+  --bg: #08131f;
+  --panel: #0f1d2c;
+  --panel-soft: #132638;
+  --line: #263d51;
+  --line-strong: #35546b;
+  --text: #e7f0f7;
+  --muted: #9fb1c0;
+  --cyan: #5cc7e8;
+  --blue: #74a8ff;
+  --green: #6dd79c;
+  --lime: #acd76b;
+  --amber: #f1b451;
+  --rose: #ff7a70;
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.36);
 }
 
 * {
@@ -3154,6 +3176,86 @@ a {
   background: #f8fbff;
 }
 
+.home-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 52px;
+  border: 1px solid #e0e6ed;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #07162a;
+  padding: 0 12px;
+  box-shadow: 0 8px 20px rgba(15, 30, 55, 0.06);
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
+  border-color: #b9c8d8;
+  background: #f8fbff;
+}
+
+.theme-toggle-sun,
+.theme-toggle-moon {
+  flex: 0 0 auto;
+}
+
+.theme-toggle-sun {
+  color: #c78316;
+}
+
+.theme-toggle-moon {
+  color: #7a8a99;
+}
+
+.theme-toggle-track {
+  position: relative;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 18px;
+  border-radius: 999px;
+  background: #dbe7f1;
+  transition: background 160ms ease;
+}
+
+.theme-toggle-track span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(7, 22, 42, 0.24);
+  transition: transform 160ms ease;
+}
+
+.theme-toggle.night .theme-toggle-track {
+  background: #1d5bd8;
+}
+
+.theme-toggle.night .theme-toggle-track span {
+  transform: translateX(16px);
+}
+
+.theme-toggle.night .theme-toggle-sun {
+  color: #7e8fa5;
+}
+
+.theme-toggle.night .theme-toggle-moon {
+  color: #74a8ff;
+}
+
 .home-mobile-menu-button,
 .mobile-nav-layer {
   display: none;
@@ -3499,11 +3601,12 @@ body.mobile-nav-open {
 
 .home-insight-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.58fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 24px;
 }
 
 .home-insight-card {
+  position: relative;
   display: grid;
   grid-template-rows: 256px minmax(0, 1fr);
   min-width: 0;
@@ -3520,19 +3623,17 @@ body.mobile-nav-open {
     border-color 160ms ease,
     box-shadow 160ms ease,
     transform 160ms ease;
-}
-
-.home-insight-card.featured {
-  grid-template-rows: 410px minmax(0, 1fr);
+  transform-origin: center;
 }
 
 .home-insight-card:hover,
 .home-insight-card:focus-visible {
-  border-color: #aebfe0;
+  z-index: 2;
+  border-color: #8fa8d7;
   box-shadow:
-    0 24px 58px rgba(26, 45, 85, 0.16),
+    0 28px 68px rgba(26, 45, 85, 0.2),
     0 1px 0 rgba(255, 255, 255, 0.92);
-  transform: translateY(-4px);
+  transform: translateY(-6px) scale(1.025);
 }
 
 .home-insight-card:focus-visible {
@@ -3583,11 +3684,6 @@ body.mobile-nav-open {
 .home-insight-card:hover h3,
 .home-insight-card:focus-visible h3 {
   color: #175cff;
-}
-
-.home-insight-card.featured h3 {
-  max-width: 680px;
-  font-size: clamp(1.48rem, 1.8vw, 1.95rem);
 }
 
 .home-insight-date {
@@ -4130,7 +4226,8 @@ body.mobile-nav-open {
   }
 
   .home-nav-link,
-  .home-contact {
+  .home-contact,
+  .theme-toggle {
     font-size: 0.95rem;
   }
 
@@ -4142,8 +4239,7 @@ body.mobile-nav-open {
     grid-template-columns: 1fr;
   }
 
-  .home-insight-card,
-  .home-insight-card.featured {
+  .home-insight-card {
     grid-template-rows: 320px minmax(0, 1fr);
     min-height: 0;
   }
@@ -4222,7 +4318,8 @@ body.mobile-nav-open {
     max-width: 210px;
   }
 
-  .home-contact {
+  .home-contact,
+  .home-header-actions {
     display: none;
   }
 
@@ -4385,6 +4482,14 @@ body.mobile-nav-open {
     border-color: #1d4ed8;
     background: #1d4ed8;
     color: #ffffff;
+  }
+
+  .mobile-nav-theme-toggle {
+    width: 100%;
+    min-height: 48px;
+    border-color: #cfdced;
+    border-radius: 8px;
+    box-shadow: none;
   }
 
   .home-hero {
@@ -4771,8 +4876,7 @@ body.mobile-nav-open {
     max-width: 100%;
   }
 
-  .home-insight-card,
-  .home-insight-card.featured {
+  .home-insight-card {
     grid-template-rows: 220px minmax(0, 1fr);
     width: 100%;
     max-width: 100%;
@@ -4789,8 +4893,7 @@ body.mobile-nav-open {
     padding: 24px 24px 22px;
   }
 
-  .home-insight-card h3,
-  .home-insight-card.featured h3 {
+  .home-insight-card h3 {
     font-size: 1.22rem;
     overflow-wrap: anywhere;
   }
@@ -6692,55 +6795,43 @@ button.map-ranking-row.active {
 }
 
 .target-map-legend-labels {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  row-gap: 1px;
-  column-gap: 8px;
+  position: relative;
+  min-height: 30px;
   color: #466292;
   font-size: 0.6rem;
 }
 
+.target-map-legend-end,
+.target-map-legend-value {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .target-map-legend-end {
-  color: #5d7291;
-  font-size: 0.57rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
+  top: 0;
   text-transform: uppercase;
 }
 
-.target-map-legend-value {
-  font-family: var(--font-mono);
-  font-weight: 800;
-}
-
-.target-map-legend-low {
-  grid-column: 1;
-  grid-row: 1;
-  justify-self: start;
-}
-
-.target-map-legend-high {
-  grid-column: 3;
-  grid-row: 1;
-  justify-self: end;
-}
-
+.target-map-legend-low,
 .target-map-legend-min {
-  grid-column: 1;
-  grid-row: 2;
-  justify-self: start;
+  left: 0;
+}
+
+.target-map-legend-high,
+.target-map-legend-max {
+  right: 0;
+}
+
+.target-map-legend-value {
+  top: 15px;
 }
 
 .target-map-legend-mid {
-  grid-column: 2;
-  grid-row: 2;
-  justify-self: center;
-}
-
-.target-map-legend-max {
-  grid-column: 3;
-  grid-row: 2;
-  justify-self: end;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .target-map-unavailable {
@@ -7889,7 +7980,8 @@ button.target-city-row.active {
 
 .health-kpi-card svg {
   flex: 0 0 auto;
-  color: color-mix(in srgb, var(--health-accent) 26%, transparent);
+  color: var(--health-accent);
+  opacity: 0.92;
 }
 
 .health-panel {
@@ -8534,7 +8626,8 @@ button.target-city-row.active {
 }
 
 .health-kpi-card svg {
-  color: color-mix(in srgb, var(--health-accent) 12%, transparent);
+  color: var(--health-accent);
+  opacity: 0.96;
 }
 
 .health-panel,
@@ -9022,6 +9115,94 @@ button.target-city-row.active {
   border-radius: inherit;
 }
 
+.health-page .city-exposure-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  border-top: 1px solid var(--health-line);
+  background: #f8fbff;
+  padding: 10px 14px;
+}
+
+.health-page .city-exposure-pagination-summary {
+  margin: 0;
+  color: #526b91;
+  font-family: var(--font-mono);
+  font-size: 0.69rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.health-page .city-exposure-pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.health-page .city-exposure-page-button,
+.health-page .city-exposure-pagination-ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.health-page .city-exposure-page-button {
+  border: 1px solid #cfdbeb;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+}
+
+.health-page .city-exposure-page-button.icon {
+  min-width: 30px;
+  padding: 0;
+}
+
+.health-page .city-exposure-page-icon.mirror,
+.health-page .city-exposure-page-double-icon.mirror {
+  transform: rotate(180deg);
+}
+
+.health-page .city-exposure-page-double-icon {
+  display: inline-grid;
+  grid-template-columns: 8px 8px;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+}
+
+.health-page .city-exposure-page-button:hover,
+.health-page .city-exposure-page-button:focus-visible {
+  border-color: #8fb0db;
+  background: #eef6ff;
+  color: #17438d;
+}
+
+.health-page .city-exposure-page-button.active {
+  border-color: #17438d;
+  background: #17438d;
+  color: #ffffff;
+}
+
+.health-page .city-exposure-page-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.health-page .city-exposure-pagination-ellipsis {
+  color: #7b8fa9;
+  letter-spacing: 0;
+}
+
 @media (max-width: 1180px) {
   .health-page .health-dashboard-shell {
     padding-inline: 18px;
@@ -9052,6 +9233,17 @@ button.target-city-row.active {
 
   .health-page .health-insight-section .health-insight-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .health-page .city-exposure-pagination {
+    display: grid;
+    justify-items: stretch;
+  }
+
+  .health-page .city-exposure-pagination-controls {
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
   }
 }
 
@@ -11389,6 +11581,18 @@ button.target-city-row.active {
   font-size: 0.94rem;
 }
 
+/* Shared branded shell bottom spacing, aligned with the Insights detail page. */
+.data-page-shell,
+.branded-map-page .data-page-shell,
+.health-page .health-dashboard-shell,
+.cities-page .cities-dashboard-shell,
+.trends-dashboard-shell,
+.about-dashboard-shell,
+.contact-dashboard-shell,
+.insights-detail-shell {
+  padding-bottom: 72px;
+}
+
 @media (max-width: 760px) {
   html {
     font-size: 16.5px;
@@ -11403,6 +11607,7 @@ button.target-city-row.active {
   .contact-dashboard-shell,
   .insights-detail-shell {
     padding-inline: clamp(12px, 4vw, 18px);
+    padding-bottom: 24px;
   }
 
   .data-page-heading,
@@ -11632,6 +11837,1052 @@ button.target-city-row.active {
   .target-city-panel .target-city-score b {
     font-size: 0.6rem;
   }
+}
+
+html[data-theme="night"] body,
+html[data-theme="night"] .observatory-frame {
+  background: var(--bg);
+  color: var(--text);
+}
+
+html[data-theme="night"] button,
+html[data-theme="night"] select,
+html[data-theme="night"] input,
+html[data-theme="night"] textarea {
+  border-color: var(--line);
+}
+
+html[data-theme="night"] select,
+html[data-theme="night"] input,
+html[data-theme="night"] textarea,
+html[data-theme="night"] .filter-bar select,
+html[data-theme="night"] .explorer-rail select,
+html[data-theme="night"] .range-controls input,
+html[data-theme="night"] .data-toolbar select,
+html[data-theme="night"] .target-map-control-bar select,
+html[data-theme="night"] .contact-form-panel input,
+html[data-theme="night"] .contact-form-panel select,
+html[data-theme="night"] .contact-form-panel textarea {
+  background: #132436;
+  color: var(--text);
+  border-color: var(--line);
+}
+
+html[data-theme="night"] .home-sticky-nav,
+html[data-theme="night"] .home-header {
+  background: #081523;
+  color: var(--text);
+  box-shadow: 0 1px 0 rgba(127, 157, 182, 0.16);
+}
+
+html[data-theme="night"] .home-beta {
+  border-bottom-color: rgba(148, 180, 205, 0.18);
+  background: #03101f;
+}
+
+html[data-theme="night"] .home-nav-link,
+html[data-theme="night"] .home-nav-button,
+html[data-theme="night"] .home-contact,
+html[data-theme="night"] .theme-toggle,
+html[data-theme="night"] .home-mobile-menu-button {
+  color: var(--text);
+}
+
+html[data-theme="night"] .home-contact,
+html[data-theme="night"] .theme-toggle,
+html[data-theme="night"] .home-mobile-menu-button {
+  border-color: #2c4359;
+  background: #102033;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.26);
+}
+
+html[data-theme="night"] .home-contact:hover,
+html[data-theme="night"] .home-contact:focus-visible,
+html[data-theme="night"] .theme-toggle:hover,
+html[data-theme="night"] .theme-toggle:focus-visible,
+html[data-theme="night"] .home-mobile-menu-button:hover,
+html[data-theme="night"] .home-mobile-menu-button:focus-visible {
+  border-color: #496982;
+  background: #172b40;
+}
+
+html[data-theme="night"] .home-contact.active,
+html[data-theme="night"] .home-nav-link.active,
+html[data-theme="night"] .home-nav-link:hover,
+html[data-theme="night"] .home-nav-link:focus-visible {
+  color: #7db7ff;
+}
+
+html[data-theme="night"] .theme-toggle-track {
+  background: #26384b;
+}
+
+html[data-theme="night"] .home-explore-menu,
+html[data-theme="night"] .mobile-nav-drawer,
+html[data-theme="night"] .mobile-nav-actions,
+html[data-theme="night"] .mobile-nav-close,
+html[data-theme="night"] .mobile-nav-action:not(.primary) {
+  border-color: #2a4055;
+  background: #0f1d2c;
+  color: var(--text);
+}
+
+html[data-theme="night"] .home-explore-menu-link,
+html[data-theme="night"] .mobile-nav-link {
+  color: #dce8f2;
+}
+
+html[data-theme="night"] .home-explore-menu-link:hover,
+html[data-theme="night"] .home-explore-menu-link:focus-visible,
+html[data-theme="night"] .home-explore-menu-link.active,
+html[data-theme="night"] .mobile-nav-link:hover,
+html[data-theme="night"] .mobile-nav-link:focus-visible,
+html[data-theme="night"] .mobile-nav-link.active {
+  background: #172d44;
+  color: #8ec2ff;
+}
+
+html[data-theme="night"] .mobile-nav-label,
+html[data-theme="night"] .mobile-nav-link svg {
+  color: #94a8bb;
+}
+
+html[data-theme="night"] .mobile-nav-backdrop {
+  background: rgba(0, 7, 16, 0.68);
+}
+
+html[data-theme="night"] .home-page,
+html[data-theme="night"] .home-insights,
+html[data-theme="night"] .home-risk,
+html[data-theme="night"] .not-found-page {
+  background: #07131f;
+  color: var(--text);
+}
+
+html[data-theme="night"] .home-insight-card,
+html[data-theme="night"] .home-risk-scale,
+html[data-theme="night"] .not-found-panel,
+html[data-theme="night"] .home-risk-chip,
+html[data-theme="night"] .home-methodology-step {
+  border-color: #273f55;
+  background: #0f1d2c;
+  color: var(--text);
+}
+
+html[data-theme="night"] .home-insights-header p,
+html[data-theme="night"] .home-risk-header p,
+html[data-theme="night"] .home-methodology-header p,
+html[data-theme="night"] .home-methodology-step p,
+html[data-theme="night"] .not-found-panel p:not(.section-kicker) {
+  color: var(--muted);
+}
+
+html[data-theme="night"] .branded-data-page,
+html[data-theme="night"] .health-page,
+html[data-theme="night"] .cities-page,
+html[data-theme="night"] .trends-page,
+html[data-theme="night"] .about-page,
+html[data-theme="night"] .contact-page {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(75, 137, 255, 0.12), transparent 31%),
+    linear-gradient(180deg, #091523 0%, #0b1724 48%, #08131f 100%);
+  color: var(--text);
+}
+
+html[data-theme="night"] .contact-page {
+  --contact-line: #2a4057;
+  --contact-soft-line: #22374d;
+  --contact-text: #edf6fc;
+  --contact-muted: #9fb2c7;
+  --contact-blue: #7db7ff;
+  --contact-green: #72dda2;
+  --contact-amber: #f4bd62;
+}
+
+html[data-theme="night"] .data-page-heading {
+  border-bottom-color: var(--line);
+}
+
+html[data-theme="night"] .data-page-heading h1,
+html[data-theme="night"] .health-hero h1,
+html[data-theme="night"] .cities-hero-panel h1,
+html[data-theme="night"] .trends-hero-panel h1,
+html[data-theme="night"] .about-hero-panel h1,
+html[data-theme="night"] .contact-hero-panel h1,
+html[data-theme="night"] .page-header h1 {
+  color: var(--text);
+}
+
+html[data-theme="night"] .data-page-heading p,
+html[data-theme="night"] .health-hero p,
+html[data-theme="night"] .cities-hero-panel p,
+html[data-theme="night"] .trends-hero-panel p,
+html[data-theme="night"] .about-hero-panel p,
+html[data-theme="night"] .contact-hero-panel p,
+html[data-theme="night"] .page-header p {
+  color: var(--muted);
+}
+
+html[data-theme="night"] .page-header,
+html[data-theme="night"] .filter-bar,
+html[data-theme="night"] .kpi-card,
+html[data-theme="night"] .chart-card,
+html[data-theme="night"] .table-panel,
+html[data-theme="night"] .map-section,
+html[data-theme="night"] .report-preview,
+html[data-theme="night"] .report-actions,
+html[data-theme="night"] .admin-card,
+html[data-theme="night"] .ops-log,
+html[data-theme="night"] .data-kpi-card,
+html[data-theme="night"] .data-panel,
+html[data-theme="night"] .health-panel,
+html[data-theme="night"] .health-insight-card,
+html[data-theme="night"] .city-exposure-card,
+html[data-theme="night"] .cities-page .city-table-panel,
+html[data-theme="night"] .cities-page .city-detail-panel,
+html[data-theme="night"] .cities-page .cities-chart-panel,
+html[data-theme="night"] .trends-panel,
+html[data-theme="night"] .about-info-card,
+html[data-theme="night"] .about-method-panel,
+html[data-theme="night"] .about-feedback-panel,
+html[data-theme="night"] .contact-hero-panel,
+html[data-theme="night"] .contact-summary-grid article,
+html[data-theme="night"] .contact-channel-card,
+html[data-theme="night"] .contact-form-panel,
+html[data-theme="night"] .contact-info-panel,
+html[data-theme="night"] .contact-guidance-panel {
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+html[data-theme="night"] .panel-header,
+html[data-theme="night"] .chart-legend,
+html[data-theme="night"] .contact-form-panel > header,
+html[data-theme="night"] .contact-guidance-intro,
+html[data-theme="night"] .contact-checklist,
+html[data-theme="night"] .contact-guidance-panel section,
+html[data-theme="night"] .cities-page .city-table-panel .data-panel-header,
+html[data-theme="night"] .cities-page .cities-chart-panel .data-panel-header {
+  border-color: var(--line);
+  background: var(--panel-soft);
+}
+
+html[data-theme="night"] .kpi-card small,
+html[data-theme="night"] .kpi-label,
+html[data-theme="night"] .panel-header span,
+html[data-theme="night"] .layer-title,
+html[data-theme="night"] .table-head,
+html[data-theme="night"] .country-cell small,
+html[data-theme="night"] .overview-table-row span small,
+html[data-theme="night"] .axis-label,
+html[data-theme="night"] .chart-legend span,
+html[data-theme="night"] .data-kpi-card span,
+html[data-theme="night"] .data-panel-header h2,
+html[data-theme="night"] .cities-page .city-ranking-table th,
+html[data-theme="night"] .cities-page .detail-stat span,
+html[data-theme="night"] .cities-page .city-stat-list dt {
+  color: var(--muted);
+}
+
+html[data-theme="night"] .toggle,
+html[data-theme="night"] .command-button,
+html[data-theme="night"] .export-actions button,
+html[data-theme="night"] .data-action-button {
+  border-color: var(--line);
+  background: #142a3f;
+  color: var(--text);
+}
+
+html[data-theme="night"] .toggle.active,
+html[data-theme="night"] .command-button.active,
+html[data-theme="night"] .export-actions button:hover,
+html[data-theme="night"] .admin-card button:hover,
+html[data-theme="night"] .table-row:not(.table-head):hover,
+html[data-theme="night"] .table-row.active,
+html[data-theme="night"] .cities-page .city-ranking-table tr.selected td {
+  background: #172d44;
+  color: var(--text);
+}
+
+html[data-theme="night"] .grid-line,
+html[data-theme="night"] .chart-grid-line,
+html[data-theme="night"] .chart-axis-line,
+html[data-theme="night"] .chart-axis-spine,
+html[data-theme="night"] .chart-axis-tick {
+  stroke: #2b4258;
+}
+
+html[data-theme="night"] .chart-tooltip,
+html[data-theme="night"] .bar-tooltip {
+  border-color: var(--line);
+  background: rgba(12, 25, 38, 0.96);
+  color: var(--text);
+}
+
+html[data-theme="night"] .map-panel,
+html[data-theme="night"] .tropomi-map-body,
+html[data-theme="night"] .target-map-surface .map-panel {
+  border-color: var(--line-strong);
+  background: #0b1724;
+}
+
+html[data-theme="night"] .map-zoom-controls,
+html[data-theme="night"] .map-layer-button,
+html[data-theme="night"] .map-legend,
+html[data-theme="night"] .column-map-legend,
+html[data-theme="night"] .target-pop-layer-note {
+  border-color: rgba(95, 122, 145, 0.72);
+  background: rgba(15, 29, 44, 0.94);
+  color: var(--text);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+}
+
+html[data-theme="night"] .map-zoom-controls button {
+  color: var(--text);
+}
+
+html[data-theme="night"] .map-zoom-controls button + button {
+  border-top-color: rgba(95, 122, 145, 0.54);
+}
+
+html[data-theme="night"] .map-zoom-controls button:hover,
+html[data-theme="night"] .map-zoom-controls button:focus-visible {
+  background: #1a3148;
+}
+
+html[data-theme="night"] .tropomi-map-card,
+html[data-theme="night"] .target-map-control-bar,
+html[data-theme="night"] .target-map-kpi,
+html[data-theme="night"] .target-map-card,
+html[data-theme="night"] .target-city-panel {
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+html[data-theme="night"] .tropomi-map-header,
+html[data-theme="night"] .target-map-card-header,
+html[data-theme="night"] .target-city-panel header,
+html[data-theme="night"] .target-city-panel footer,
+html[data-theme="night"] .target-map-legend,
+html[data-theme="night"] .target-city-head {
+  border-color: var(--line);
+  background: var(--panel-soft);
+}
+
+html[data-theme="night"] .tropomi-map-header > span,
+html[data-theme="night"] .target-map-control-bar label span,
+html[data-theme="night"] .target-map-kpi span,
+html[data-theme="night"] .target-map-card-header h2,
+html[data-theme="night"] .target-city-panel h2,
+html[data-theme="night"] .target-city-panel p,
+html[data-theme="night"] .target-city-panel footer,
+html[data-theme="night"] .target-map-legend strong,
+html[data-theme="night"] .target-map-legend-labels {
+  color: var(--muted);
+}
+
+html[data-theme="night"] .target-map-kpi strong,
+html[data-theme="night"] .target-city-row,
+html[data-theme="night"] .cities-page .city-ranking-table td,
+html[data-theme="night"] .cities-page .city-detail-hero h2,
+html[data-theme="night"] .cities-page .detail-stat strong,
+html[data-theme="night"] .cities-page .city-stat-list dd {
+  color: var(--text);
+}
+
+html[data-theme="night"] .target-map-layer-toggle button,
+html[data-theme="night"] .target-season-tabs,
+html[data-theme="night"] .target-season-tabs button,
+html[data-theme="night"] .map-selectors select,
+html[data-theme="night"] .map-selectors button {
+  border-color: var(--line);
+  background: #132436;
+  color: var(--text);
+}
+
+html[data-theme="night"] .target-map-layer-toggle button.active,
+html[data-theme="night"] .target-season-tabs button.active {
+  border-color: #6ca7ff;
+  background: #255fcb;
+  color: #ffffff;
+}
+
+html[data-theme="night"] .target-city-row {
+  border-bottom-color: var(--line);
+  background: transparent;
+}
+
+html[data-theme="night"] button.target-city-row:hover,
+html[data-theme="night"] button.target-city-row:focus-visible,
+html[data-theme="night"] button.target-city-row.active {
+  background: #172d44;
+}
+
+html[data-theme="night"] .target-map-unavailable {
+  color: var(--muted);
+}
+
+html[data-theme="night"] .target-map-unavailable strong {
+  color: var(--text);
+}
+
+html[data-theme="night"] .target-map-unavailable span {
+  color: var(--muted);
+}
+
+html[data-theme="night"] .observatory-footer {
+  border-top-color: rgba(129, 162, 188, 0.2);
+  background: #040d18;
+}
+
+html[data-theme="night"] .observatory-footer-app {
+  border-color: var(--line);
+}
+
+html[data-theme="night"] .skeleton-route {
+  --skeleton-base: #1b2f42;
+  --skeleton-mid: #263d52;
+  --skeleton-strong: #35526a;
+}
+
+html[data-theme="night"] .skeleton-card,
+html[data-theme="night"] .skeleton-chart-card,
+html[data-theme="night"] .skeleton-kpi-card,
+html[data-theme="night"] .skeleton-admin-card,
+html[data-theme="night"] .skeleton-report-preview,
+html[data-theme="night"] .skeleton-ranking-table {
+  background: var(--panel);
+}
+
+html[data-theme="night"] .skeleton-line,
+html[data-theme="night"] .skeleton-block,
+html[data-theme="night"] .skeleton-pill {
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent),
+    var(--skeleton-base);
+}
+
+html[data-theme="night"] .skeleton-map-panel {
+  background:
+    linear-gradient(135deg, rgba(19, 38, 56, 0.92), rgba(10, 22, 34, 0.94)),
+    #0b1724;
+}
+
+html[data-theme="night"] .skeleton-map-panel::before {
+  background-image:
+    linear-gradient(rgba(135, 170, 198, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(135, 170, 198, 0.08) 1px, transparent 1px);
+}
+
+html[data-theme="night"] .skeleton-map-panel::after {
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.12), transparent 70%);
+}
+
+/* Complete night coverage for page-specific sections that use hardcoded light colors. */
+html[data-theme="night"] {
+  --theme-page-bg: #08131f;
+  --theme-page-bg-soft: #0b1724;
+  --theme-surface: #0f1d2c;
+  --theme-surface-raised: #132436;
+  --theme-surface-soft: #162b3f;
+  --theme-line: #293f55;
+  --theme-line-soft: #20364b;
+  --theme-text: #eaf3fb;
+  --theme-muted: #9fb2c5;
+  --theme-faint: #7f93a6;
+  --theme-accent: #7db7ff;
+  --theme-accent-strong: #3b82f6;
+  --theme-warning-bg: #372317;
+  --theme-warning-line: #7c4a1d;
+  --theme-warning-text: #ffd7a8;
+}
+
+html[data-theme="night"] .health-page {
+  --health-bg: var(--theme-page-bg);
+  --health-red: #fb7185;
+  --health-orange: #fbbf24;
+  --health-blue: #7db7ff;
+  --health-purple: #c084fc;
+  --health-line: var(--theme-line);
+  --health-soft-line: var(--theme-line-soft);
+  --health-panel: var(--theme-surface);
+  --health-text: var(--theme-text);
+  --health-muted: var(--theme-muted);
+}
+
+html[data-theme="night"] .cities-page {
+  --cities-line: var(--theme-line);
+  --cities-soft-line: var(--theme-line-soft);
+  --cities-text: var(--theme-text);
+  --cities-muted: var(--theme-muted);
+  --cities-blue: var(--theme-accent);
+}
+
+html[data-theme="night"] .trends-page {
+  --trends-line: var(--theme-line);
+  --trends-soft-line: var(--theme-line-soft);
+  --trends-text: var(--theme-text);
+  --trends-muted: var(--theme-muted);
+  --trends-blue: var(--theme-accent);
+}
+
+html[data-theme="night"] .about-page {
+  --about-line: var(--theme-line);
+  --about-soft-line: var(--theme-line-soft);
+  --about-text: var(--theme-text);
+  --about-muted: var(--theme-muted);
+  --about-blue: var(--theme-accent);
+  --about-ink: #071827;
+}
+
+html[data-theme="night"] .contact-page {
+  --contact-line: var(--theme-line);
+  --contact-soft-line: var(--theme-line-soft);
+  --contact-text: var(--theme-text);
+  --contact-muted: var(--theme-muted);
+  --contact-blue: var(--theme-accent);
+  --contact-green: #72dda2;
+  --contact-amber: #f4bd62;
+}
+
+html[data-theme="night"] :where(
+  .home-page,
+  .branded-data-page,
+  .insights-detail-page,
+  .health-page,
+  .cities-page,
+  .trends-page,
+  .about-page,
+  .contact-page
+) {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(80, 145, 255, 0.12), transparent 30%),
+    linear-gradient(180deg, #091523 0%, #0b1724 45%, #08131f 100%) !important;
+  color: var(--theme-text) !important;
+}
+
+html[data-theme="night"] :where(
+  .home-insights,
+  .home-risk,
+  .not-found-page,
+  .insights-detail-shell,
+  .data-page-shell,
+  .health-dashboard-shell,
+  .cities-dashboard-shell,
+  .trends-dashboard-shell,
+  .about-dashboard-shell,
+  .contact-dashboard-shell
+) {
+  background: transparent !important;
+  color: var(--theme-text) !important;
+}
+
+html[data-theme="night"] :where(
+  .home-metric,
+  .home-insight-card,
+  .home-risk-scale,
+  .home-risk-row,
+  .home-risk-chip,
+  .not-found-panel,
+  .insights-kpi-card,
+  .insights-panel,
+  .insights-note,
+  .data-kpi-card,
+  .data-panel,
+  .map-ranking-panel,
+  .map-ranking-row,
+  .cities-hero-panel,
+  .cities-filter-panel,
+  .cities-kpi-card,
+  .city-table-wrap,
+  .city-search-control,
+  .city-table-footnote,
+  .cities-page .city-table-panel,
+  .cities-page .city-detail-panel,
+  .cities-page .cities-chart-panel,
+  .cities-page .detail-stat,
+  .cities-page .interpretation-box,
+  .health-filter-panel,
+  .health-kpi-card,
+  .health-panel,
+  .health-tier-summary-row,
+  .health-chart-card,
+  .health-bar-track,
+  .city-exposure-card,
+  .health-page .health-insight-card,
+  .health-page .health-insight-section .health-insight-card,
+  .trends-hero-panel,
+  .trends-filter-panel,
+  .trends-panel,
+  .trends-panel header > span,
+  .about-hero-panel,
+  .about-info-card,
+  .about-method-panel,
+  .about-method-card,
+  .about-data-panel,
+  .about-feedback-panel,
+  .about-badge-row span,
+  .about-info-card code,
+  .contact-hero-panel,
+  .contact-summary-grid article,
+  .contact-channel-card,
+  .contact-form-panel,
+  .contact-info-panel,
+  .contact-guidance-panel,
+  .contact-channel-icon,
+  .contact-channel-card a,
+  .contact-panel-icon
+) {
+  border-color: var(--theme-line) !important;
+  background: var(--theme-surface) !important;
+  color: var(--theme-text) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+html[data-theme="night"] :where(
+  .home-insight-body,
+  .home-methodology,
+  .home-methodology-step,
+  .home-risk-track,
+  .insights-panel header > span,
+  .risk-donut-track,
+  .city-ranking-table th,
+  .cities-page .city-ranking-table th,
+  .cities-page .city-ranking-table tr.selected td,
+  .cities-page .city-detail-section,
+  .cities-page .city-detail-hero,
+  .health-panel-header > strong,
+  .health-tier-stack,
+  .health-tier-row div,
+  .health-page .city-exposure-score,
+  .contact-form-panel > header,
+  .contact-guidance-intro,
+  .contact-checklist,
+  .contact-guidance-panel section,
+  .about-data-table thead th,
+  .about-data-panel > header,
+  .about-feedback-panel > header,
+  .cities-page .city-table-panel .data-panel-header,
+  .cities-page .cities-chart-panel .data-panel-header,
+  .health-page .city-exposure-section .health-panel-header,
+  .health-page .health-insight-section .health-panel-header,
+  .target-city-panel .target-city-row
+) {
+  border-color: var(--theme-line) !important;
+  background: var(--theme-surface-soft) !important;
+  color: var(--theme-text) !important;
+}
+
+html[data-theme="night"] :where(
+  .data-page-heading,
+  .insights-detail-heading,
+  .city-score-block,
+  .comparison-row,
+  .risk-list-row,
+  .city-detail-section,
+  .cities-page .city-stat-list div,
+  .about-method-panel > header,
+  .about-data-table th,
+  .about-data-table td,
+  .city-ranking-table th,
+  .city-ranking-table td,
+  .cities-page .city-ranking-table th,
+  .cities-page .city-ranking-table td,
+  .health-chart-canvas-wrap,
+  .health-bar-chart,
+  .city-exposure-section .health-panel-header
+) {
+  border-color: var(--theme-line) !important;
+}
+
+html[data-theme="night"] :where(
+  .home-insights-header h2,
+  .home-methodology-header h2,
+  .home-risk-header h2,
+  .home-insight-card h3,
+  .home-methodology-step h3,
+  .not-found-panel h1,
+  .insights-detail-heading h1,
+  .insights-note h3,
+  .data-page-heading h1,
+  .data-kpi-card strong,
+  .data-panel-header h2,
+  .map-ranking-row,
+  .map-ranking-row strong,
+  .cities-hero-panel h1,
+  .cities-kpi-card strong,
+  .cities-page .city-ranking-table button,
+  .cities-page .city-detail-hero h2,
+  .cities-page .detail-stat strong,
+  .cities-page .season-bar strong,
+  .cities-page .city-stat-list dd,
+  .city-detail-panel h2,
+  .detail-stat strong,
+  .season-bar strong,
+  .interpretation-box strong,
+  .comparison-row > div:first-child strong,
+  .health-tier-row strong,
+  .health-tier-row b,
+  .risk-list-row span,
+  .health-kpi-card strong,
+  .health-panel-header h2,
+  .health-tier-summary-row span,
+  .health-tier-summary-row b,
+  .health-bar-column strong,
+  .city-exposure-card h3,
+  .city-exposure-card dd,
+  .health-page .health-insight-card h2,
+  .health-page .health-insight-section .health-insight-card h3,
+  .trends-hero-panel h1,
+  .about-hero-panel h1,
+  .about-info-card h2,
+  .about-info-card strong,
+  .about-method-panel h2,
+  .about-method-card h3,
+  .about-data-panel h2,
+  .about-feedback-panel h2,
+  .about-data-table tbody th,
+  .contact-hero-panel h1,
+  .contact-summary-grid p,
+  .contact-channel-card h2,
+  .contact-form-panel h2,
+  .contact-info-panel h2,
+  .contact-guidance-panel h2,
+  .contact-info-link span,
+  .contact-note h3,
+  .contact-checklist li
+) {
+  color: var(--theme-text) !important;
+}
+
+html[data-theme="night"] :where(
+  .home-insights-header p,
+  .home-methodology-header p,
+  .home-methodology-step p,
+  .home-risk-header p,
+  .home-insight-tags,
+  .home-insight-date,
+  .not-found-panel p:not(.section-kicker),
+  .insights-detail-heading p,
+  .insights-kpi-card span,
+  .insights-kpi-card small,
+  .insights-panel h2,
+  .insights-panel p,
+  .insights-note p,
+  .risk-donut-legend,
+  .data-page-heading p,
+  .data-kpi-card span,
+  .data-kpi-card small,
+  .data-panel-header p,
+  .map-ranking-row span,
+  .cities-hero-panel p,
+  .cities-filter-panel label span,
+  .cities-kpi-card span,
+  .cities-kpi-card small,
+  .cities-page .city-table-panel .data-panel-header h2,
+  .cities-page .city-table-panel .data-panel-header p,
+  .cities-page .city-ranking-table th,
+  .cities-page .city-ranking-table td,
+  .cities-page .city-ranking-table .rank-cell,
+  .cities-page .city-detail-hero p,
+  .cities-page .city-detail-score span,
+  .cities-page .city-detail-section h3,
+  .cities-page .detail-stat span,
+  .cities-page .detail-stat small,
+  .cities-page .city-stat-list dt,
+  .cities-page .interpretation-box p,
+  .cities-page .cities-chart-panel .data-panel-header h2,
+  .cities-page .cities-chart-panel .data-panel-header p,
+  .city-detail-panel p,
+  .city-score-block span,
+  .detail-stat span,
+  .season-bar,
+  .comparison-row > div:first-child span,
+  .health-tier-row small,
+  .risk-list-row small,
+  .health-warning-banner p,
+  .health-filter-panel label,
+  .health-kpi-card span,
+  .health-kpi-card small,
+  .health-panel-header span,
+  .health-panel-header p,
+  .health-panel-header > strong,
+  .health-tier-summary-row small,
+  .health-bar-column small,
+  .city-exposure-card dt,
+  .city-exposure-card p,
+  .health-page .health-insight-card span,
+  .health-page .health-insight-card p,
+  .health-page .health-insight-section .health-panel-header h2,
+  .health-page .health-insight-section .health-insight-card p,
+  .trends-kicker,
+  .trends-hero-panel p,
+  .trends-filter-panel label span,
+  .trends-panel h2,
+  .trends-panel p,
+  .trends-panel header > span,
+  .about-hero-panel p,
+  .about-info-card div,
+  .about-method-card p,
+  .about-data-table td,
+  .about-feedback-panel > header p,
+  .about-feedback-panel legend,
+  .about-feedback-panel label > span,
+  .about-comment-field > span,
+  .about-audience-field label,
+  .about-feedback-contact,
+  .contact-hero-panel p,
+  .contact-hero-aside > span,
+  .contact-summary-grid span,
+  .contact-channel-tag,
+  .contact-channel-card p,
+  .contact-form-panel header p,
+  .contact-info-panel p,
+  .contact-note p,
+  .contact-panel-kicker,
+  .contact-guidance-intro > span,
+  .contact-guidance-panel p,
+  .contact-form-panel label > span,
+  .contact-message-field > span,
+  .contact-info-link strong
+) {
+  color: var(--theme-muted) !important;
+}
+
+html[data-theme="night"] :where(
+  .data-toolbar select,
+  .health-filter-panel select,
+  .cities-filter-panel select,
+  .trends-filter-panel select,
+  .city-search-control input,
+  .about-feedback-grid input,
+  .about-comment-field textarea,
+  .contact-form-panel input,
+  .contact-form-panel select,
+  .contact-form-panel textarea
+) {
+  border-color: var(--theme-line) !important;
+  background: var(--theme-surface-raised) !important;
+  color: var(--theme-text) !important;
+}
+
+html[data-theme="night"] :where(
+  .data-action-button,
+  .insights-dashboard-link,
+  .cities-export-actions button,
+  .trends-export-actions button,
+  .about-feedback-panel button[type="submit"],
+  .contact-form-panel button[type="submit"]
+) {
+  background: #255fcb !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="night"] :where(
+  .home-all-articles,
+  .about-info-card a,
+  .contact-hero-aside a,
+  .contact-channel-card a,
+  .contact-info-link svg,
+  .city-season-note,
+  .data-kicker,
+  .insights-detail-kicker,
+  .trends-kicker
+) {
+  color: var(--theme-accent) !important;
+}
+
+html[data-theme="night"] :where(
+  .data-kicker i,
+  .insights-detail-kicker i,
+  .about-page .data-kicker i,
+  .contact-page .data-kicker i
+) {
+  background: var(--theme-accent) !important;
+}
+
+html[data-theme="night"] :where(
+  .health-warning-banner
+) {
+  border-color: var(--theme-warning-line) !important;
+  background: var(--theme-warning-bg) !important;
+  color: var(--theme-warning-text) !important;
+}
+
+/* Final Health night-mode surface hardening. */
+html[data-theme="night"] .health-page .health-hero,
+html[data-theme="night"] .health-page .health-warning-banner,
+html[data-theme="night"] .health-page .health-filter-panel,
+html[data-theme="night"] .health-page .health-kpi-card,
+html[data-theme="night"] .health-page .health-panel,
+html[data-theme="night"] .health-page .health-chart-card,
+html[data-theme="night"] .health-page .city-exposure-section,
+html[data-theme="night"] .health-page .city-exposure-card,
+html[data-theme="night"] .health-page .health-insight-section {
+  border-color: var(--theme-line) !important;
+  background: var(--theme-surface) !important;
+  color: var(--theme-text) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+html[data-theme="night"] .health-page .health-panel-header,
+html[data-theme="night"] .health-page .city-exposure-section .health-panel-header,
+html[data-theme="night"] .health-page .health-insight-section .health-panel-header,
+html[data-theme="night"] .health-page .health-panel-header > strong,
+html[data-theme="night"] .health-page .city-exposure-pagination,
+html[data-theme="night"] .health-page .city-exposure-score {
+  border-color: var(--theme-line) !important;
+  background: var(--theme-surface-soft) !important;
+  color: var(--theme-text) !important;
+}
+
+html[data-theme="night"] .health-page .health-hero h1,
+html[data-theme="night"] .health-page .health-panel-header h2,
+html[data-theme="night"] .health-page .city-exposure-card h3,
+html[data-theme="night"] .health-page .city-exposure-card dd,
+html[data-theme="night"] .health-page .health-insight-section .health-insight-card h3 {
+  color: var(--theme-text) !important;
+}
+
+html[data-theme="night"] .health-page .health-hero p,
+html[data-theme="night"] .health-page .health-warning-banner p,
+html[data-theme="night"] .health-page .health-filter-panel label,
+html[data-theme="night"] .health-page .health-kpi-card span,
+html[data-theme="night"] .health-page .health-kpi-card small,
+html[data-theme="night"] .health-page .health-panel-header p,
+html[data-theme="night"] .health-page .city-exposure-card dt,
+html[data-theme="night"] .health-page .health-insight-section .health-insight-card p,
+html[data-theme="night"] .health-page .city-exposure-pagination-summary,
+html[data-theme="night"] .health-page .city-exposure-pagination-ellipsis {
+  color: var(--theme-muted) !important;
+}
+
+html[data-theme="night"] .health-page .health-filter-panel select,
+html[data-theme="night"] .health-page .city-exposure-page-button {
+  border-color: var(--theme-line) !important;
+  background: var(--theme-surface-raised) !important;
+  color: var(--theme-text) !important;
+}
+
+html[data-theme="night"] .health-page .city-exposure-page-button:hover,
+html[data-theme="night"] .health-page .city-exposure-page-button:focus-visible,
+html[data-theme="night"] .health-page .city-exposure-page-button.active {
+  border-color: var(--theme-accent) !important;
+  background: var(--theme-accent-strong) !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="night"] .health-page .health-hero-kicker svg,
+html[data-theme="night"] .health-page .health-warning-banner svg,
+html[data-theme="night"] .health-page .health-kpi-card svg,
+html[data-theme="night"] .health-page .health-panel-header svg,
+html[data-theme="night"] .health-page .health-insight-section .health-insight-card svg,
+html[data-theme="night"] .health-page .city-exposure-page-button svg {
+  color: currentColor;
+  opacity: 1 !important;
+}
+
+html[data-theme="night"] .health-page .health-hero-kicker,
+html[data-theme="night"] .health-page .health-hero-kicker svg {
+  color: #fb7185 !important;
+}
+
+html[data-theme="night"] .health-page .health-warning-banner,
+html[data-theme="night"] .health-page .health-warning-banner svg {
+  color: var(--theme-warning-text) !important;
+}
+
+html[data-theme="night"] .health-page .health-kpi-card svg {
+  color: var(--health-accent) !important;
+}
+
+html[data-theme="night"] .health-page .health-insight-section .health-panel-header svg {
+  color: var(--health-orange) !important;
+}
+
+html[data-theme="night"] .health-page .health-insight-section .health-insight-card svg {
+  color: var(--health-blue) !important;
+}
+
+html[data-theme="night"] .health-page .health-insight-section .health-insight-card-green svg {
+  color: #86efac !important;
+}
+
+html[data-theme="night"] .health-page .health-insight-section .health-insight-card-amber svg {
+  color: var(--health-orange) !important;
+}
+
+html[data-theme="night"] .health-page .health-insight-section .health-insight-card-pink svg {
+  color: #f9a8d4 !important;
+}
+
+html[data-theme="night"] .health-page .health-insight-section .health-insight-card-purple svg {
+  color: var(--health-purple) !important;
+}
+
+html[data-theme="night"] :where(
+  .insights-grid-line,
+  .chart-grid-line,
+  .grid-line
+) {
+  stroke: #2b4258 !important;
+}
+
+html[data-theme="night"] :where(
+  .insights-axis-label,
+  .insights-bar-label,
+  .insights-chart-legend,
+  .chart-axis,
+  .chart-axis text,
+  .chart-axis-title,
+  .chart-rank-label,
+  .chart-value-label,
+  .chart-title
+) {
+  fill: var(--theme-muted) !important;
+  color: var(--theme-muted) !important;
+}
+
+html[data-theme="night"] :where(
+  .chart-grid-fill,
+  .chart-bar-track
+) {
+  fill: #132436 !important;
+}
+
+html[data-theme="night"] .home-insight-visual {
+  background: linear-gradient(180deg, #132638 0%, #0f1d2c 100%) !important;
+}
+
+html[data-theme="night"] .home-insight-card:hover,
+html[data-theme="night"] .home-insight-card:focus-visible {
+  border-color: #4c7190 !important;
+  box-shadow: 0 28px 68px rgba(0, 0, 0, 0.42) !important;
+}
+
+html[data-theme="night"] :where(
+  .insights-dot,
+  .insights-chart-legend rect
+) {
+  fill: var(--theme-surface) !important;
+}
+
+html[data-theme="night"] :where(
+  .fire-mini-map,
+  .target-fire-map
+) {
+  background: linear-gradient(160deg, #132436, #0b1724) !important;
+}
+
+html[data-theme="night"] :where(
+  .mobile-nav-drawer,
+  .home-explore-menu
+) {
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42) !important;
 }
 
 @media print {

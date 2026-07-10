@@ -226,7 +226,14 @@ export function getRiskTier(score: number) {
 }
 
 export function getCityRows(season: WebDataSeason): CityNpweiRow[] {
-  const snapshot = getActiveWebDataSnapshot();
+  return getCityRowsFromSnapshot(getActiveWebDataSnapshot(), season);
+}
+
+export function getLocalCityRows(season: WebDataSeason): CityNpweiRow[] {
+  return getCityRowsFromSnapshot(localWebDataSnapshot, season);
+}
+
+function getCityRowsFromSnapshot(snapshot: WebDataSnapshot, season: WebDataSeason): CityNpweiRow[] {
   const backendRows = snapshot.cityRows?.[season];
   if (backendRows) return backendRows.map(normalizeCityRow);
 
@@ -271,7 +278,14 @@ export function getCityRow(name: string, season: WebDataSeason) {
 }
 
 export function getCountryRows(season: WebDataSeason): CountryPweRow[] {
-  const snapshot = getActiveWebDataSnapshot();
+  return getCountryRowsFromSnapshot(getActiveWebDataSnapshot(), season);
+}
+
+export function getLocalCountryRows(season: WebDataSeason): CountryPweRow[] {
+  return getCountryRowsFromSnapshot(localWebDataSnapshot, season);
+}
+
+function getCountryRowsFromSnapshot(snapshot: WebDataSnapshot, season: WebDataSeason): CountryPweRow[] {
   const backendRows = snapshot.countryRows?.[season];
   if (backendRows) return backendRows.map(normalizeCountryRow);
 
@@ -303,6 +317,10 @@ export function getCountryRows(season: WebDataSeason): CountryPweRow[] {
 
 export function getHealthSeasonSummary(season: WebDataSeason) {
   return getActiveWebDataSnapshot().healthImpact[season];
+}
+
+export function getLocalHealthSeasonSummary(season: WebDataSeason) {
+  return localWebDataSnapshot.healthImpact[season];
 }
 
 export function getHealthRiskTierRows(season: WebDataSeason): HealthRiskTierRow[] {
@@ -375,7 +393,15 @@ export function getSeasonalTrendRows(): SeasonalTrendRow[] {
 }
 
 export function getWebDataYears() {
-  const years = getActiveWebDataSnapshot().summary.years_covered;
+  return getWebDataYearsFromSnapshot(getActiveWebDataSnapshot());
+}
+
+export function getLocalWebDataYears() {
+  return getWebDataYearsFromSnapshot(localWebDataSnapshot);
+}
+
+function getWebDataYearsFromSnapshot(snapshot: WebDataSnapshot) {
+  const years = snapshot.summary.years_covered;
   return years.length > 0 ? [...years].sort((a, b) => a - b) : [2020, 2021, 2022, 2023, 2024];
 }
 

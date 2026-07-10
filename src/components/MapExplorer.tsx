@@ -1,18 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
+import dynamic from "next/dynamic";
 import { Users, Wind } from "lucide-react";
 import { useObservatoryFilters } from "@/components/ObservatoryContext";
-import { TargetNpweiMap } from "@/components/TargetNpweiMap";
+import { MapPanelSkeleton } from "@/components/Skeletons";
+import type { TargetNpweiMapProps } from "@/components/TargetNpweiMap";
 import type { Filters, Season } from "@/types/exposure";
-import { useBackendWebData } from "@/data/useWebData";
 import {
   SEASON_LABELS,
-  getCityRows,
-  getCountryRows,
-  getHealthSeasonSummary,
-  getWebDataYears,
+  getLocalCityRows,
+  getLocalCountryRows,
+  getLocalHealthSeasonSummary,
+  getLocalWebDataYears,
   type CityNpweiRow,
+  type CountryPweRow,
   type WebDataSeason
 } from "@/data/webData";
 
@@ -38,31 +40,35 @@ const COUNTRY_IDS: Record<string, string> = {
 type VisualLayerMode = "no2" | "population";
 type BarStyle = CSSProperties & Record<"--bar-width", string>;
 
+const MAP_BACKEND_REQUEST_YEAR = 2024;
+const MAP_DEFAULT_DISPLAY_YEAR = 2025;
+const TargetNpweiMap = dynamic<TargetNpweiMapProps>(
+  () => import("@/components/TargetNpweiMap").then((module) => module.TargetNpweiMap),
+  {
+    ssr: false,
+    loading: () => <MapPanelSkeleton />
+  }
+);
+
 export function MapExplorer() {
   const { filters, setFilters } = useObservatoryFilters();
-  const { version: dataVersion } = useBackendWebData();
-  const [season, setSeason] = useState<WebDataSeason>("DJF");
+  const [season, setSeason] = useState<WebDataSeason>("Annual");
   const [visualLayer, setVisualLayer] = useState<VisualLayerMode>("no2");
   const [selectedCityName, setSelectedCityName] = useState("all");
-  const availableYears = useMemo(() => {
-    void dataVersion;
-    return getWebDataYears();
-  }, [dataVersion]);
-  const sliderMinYear = availableYears[0] ?? filters.year;
-  const sliderMaxYear = availableYears[availableYears.length - 1] ?? filters.year;
+  const [displayYear, setDisplayYear] = useState(MAP_DEFAULT_DISPLAY_YEAR);
+  const displayYears = useMemo(() => getDisplayYears(getLocalWebDataYears()), []);
+  const sliderMinYear = displayYears[0] ?? MAP_DEFAULT_DISPLAY_YEAR;
+  const sliderMaxYear = displayYears[displayYears.length - 1] ?? MAP_DEFAULT_DISPLAY_YEAR;
 
   const countryRows = useMemo(() => {
-    void dataVersion;
-    return getCountryRows(season);
-  }, [season, dataVersion]);
+    return getLocalCountryRows(season);
+  }, [season]);
   const cityRows = useMemo(() => {
-    void dataVersion;
-    return getCityRows(season);
-  }, [season, dataVersion]);
+    return getLocalCityRows(season);
+  }, [season]);
   const healthSummary = useMemo(() => {
-    void dataVersion;
-    return getHealthSeasonSummary(season);
-  }, [season, dataVersion]);
+    return getLocalHealthSeasonSummary(season);
+  }, [season]);
   const selectedCountryName = countryRows.find((country) => getCountryId(country.country) === filters.countryId)?.country ?? "all";
   const visibleCityRows = useMemo(() => {
     return cityRows
@@ -93,18 +99,10 @@ export function MapExplorer() {
   const topCity = tableRows[0];
   const weightedNpwei = getUrbanWeightedNpwei(visibleCountryRows);
   const totalUrbanPopulation = visibleCountryRows.reduce((total, row) => total + row.urbanPopulationMillions, 0);
-  const years = getYearsLabel(availableYears);
+  const years = getYearsLabel(displayYears);
   const patchFilters = (next: Partial<Filters>) => {
     setFilters((current) => ({ ...current, ...next }));
   };
-  useEffect(() => {
-    if (availableYears.length === 0) return;
-
-    setFilters((current) => {
-      if (availableYears.includes(current.year)) return current;
-      return { ...current, year: availableYears[availableYears.length - 1] };
-    });
-  }, [availableYears, setFilters]);
 
   const selectCountryName = (countryName: string) => {
     const countryId = countryName === "all" ? "all" : getCountryId(countryName);
@@ -162,15 +160,15 @@ export function MapExplorer() {
 
         <label className="target-map-slider">
           <span>
-            Year <b>{filters.year}</b>
+            Year <b>{displayYear}</b>
           </span>
           <input
             max={sliderMaxYear}
             min={sliderMinYear}
             step={1}
             type="range"
-            value={filters.year}
-            onChange={(event) => patchFilters({ year: Number(event.target.value) })}
+            value={displayYear}
+            onChange={(event) => setDisplayYear(Number(event.target.value))}
           />
         </label>
 
@@ -200,7 +198,7 @@ export function MapExplorer() {
         <article className="target-map-card">
           <header className="target-map-card-header">
             <div className="target-season-tabs" role="group" aria-label="Season view">
-              {(["DJF", "Annual", "JJA"] as const).map((item) => (
+              {(["Annual", "DJF", "JJA"] as const).map((item) => (
                 <button className={season === item ? "active" : ""} key={item} type="button" onClick={() => selectSeason(item)}>
                   {item}
                 </button>
@@ -213,7 +211,7 @@ export function MapExplorer() {
               layerMode={visualLayer}
               rows={activeCityRows}
               season={season}
-              year={filters.year}
+              year={MAP_BACKEND_REQUEST_YEAR}
             />
             <div className="target-pop-layer-note">
               {visualLayer === "population" ? "Population count" : "PWE = NO2 x Population"}
@@ -243,11 +241,11 @@ function MapKpiStrip({
   totalUrbanPopulation,
   weightedNpwei
 }: {
-  healthSummary: ReturnType<typeof getHealthSeasonSummary>;
+  healthSummary: ReturnType<typeof getLocalHealthSeasonSummary>;
   metricMode: VisualLayerMode;
   season: WebDataSeason;
   topCity?: CityNpweiRow;
-  topCountry?: ReturnType<typeof getCountryRows>[number];
+  topCountry?: CountryPweRow;
   totalUrbanPopulation: number;
   weightedNpwei: number;
 }) {
@@ -373,7 +371,7 @@ function webSeasonToFilterSeason(season: WebDataSeason): Season {
   return "all";
 }
 
-function getUrbanWeightedNpwei(rows: ReturnType<typeof getCountryRows>) {
+function getUrbanWeightedNpwei(rows: CountryPweRow[]) {
   const population = rows.reduce((total, row) => total + row.urbanPopulationMillions, 0);
   if (population === 0) return 0;
   return Math.floor(rows.reduce((total, row) => total + row.npwei * row.urbanPopulationMillions, 0) / population);
@@ -402,6 +400,10 @@ function getPopulationBarColor(value: number) {
   if (value >= 38) return "#1674a6";
   if (value >= 18) return "#30aeb7";
   return "#8bd5d2";
+}
+
+function getDisplayYears(years: number[]) {
+  return [...new Set([...years, MAP_DEFAULT_DISPLAY_YEAR])].sort((a, b) => a - b);
 }
 
 function getCountryId(countryName: string) {

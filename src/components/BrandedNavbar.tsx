@@ -18,6 +18,7 @@ import {
   Newspaper,
   X
 } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const exploreItems = [
   { href: "/map", label: "Map", icon: Map },
@@ -174,10 +175,13 @@ export function BrandedNavbar({ className = "" }: { className?: string }) {
             ))}
           </nav>
 
-          <Link className={pathname === "/contact" ? "home-contact active" : "home-contact"} href="/contact">
-            <Mail size={21} aria-hidden />
-            <span>Contact</span>
-          </Link>
+          <div className="home-header-actions">
+            <Link className={pathname === "/contact" ? "home-contact active" : "home-contact"} href="/contact">
+              <Mail size={21} aria-hidden />
+              <span>Contact</span>
+            </Link>
+            <ThemeToggle className="home-theme-toggle" />
+          </div>
 
           <button
             aria-controls="mobile-nav-drawer"
@@ -264,6 +268,7 @@ export function BrandedNavbar({ className = "" }: { className?: string }) {
                 <Mail size={18} aria-hidden />
                 <span>Contact</span>
               </Link>
+              <ThemeToggle className="mobile-nav-theme-toggle" />
               <Link className="mobile-nav-action" href="/#feedback" onClick={closeMobileMenu}>
                 <MessageCircle size={18} aria-hidden />
                 <span>Submit Feedback</span>

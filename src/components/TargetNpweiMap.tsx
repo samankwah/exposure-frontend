@@ -8,10 +8,12 @@ import * as maplibregl from "maplibre-gl";
 import MapLibreMap, { ScaleControl } from "react-map-gl/maplibre";
 import { Minus, Plus } from "lucide-react";
 import { MapPanelSkeleton } from "@/components/Skeletons";
+import { useTheme } from "@/components/ThemeProvider";
 import westAfricaBoundary from "@/data/westAfricaBoundary.json";
 import {
   buildNo2TileUrlTemplate,
   getApiBaseUrl,
+  getNo2MapDisplayLog10ExposureRange,
   getNo2MapSeasonYearRanges,
   loadNo2MapData,
   type No2MapGridFeatureCollection,
@@ -21,7 +23,7 @@ import {
 } from "@/data/webDataClient";
 import { NO2_COLUMN_UNIT_LABEL, pweToColumn, type CityNpweiRow, type WebDataSeason } from "@/data/webData";
 
-const MAP_STYLE = {
+const DAY_MAP_STYLE = {
   version: 8,
   sources: {
     "carto-light": {
@@ -56,6 +58,41 @@ const MAP_STYLE = {
   ]
 } as const;
 
+const NIGHT_MAP_STYLE = {
+  version: 8,
+  sources: {
+    "carto-dark": {
+      type: "raster",
+      tiles: [
+        "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+        "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+        "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+        "https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
+      ],
+      tileSize: 256,
+      attribution: "&copy; CARTO"
+    }
+  },
+  layers: [
+    {
+      id: "local-background",
+      type: "background",
+      paint: {
+        "background-color": "#0b1724"
+      }
+    },
+    {
+      id: "carto-dark",
+      type: "raster",
+      source: "carto-dark",
+      paint: {
+        "raster-opacity": 0.9,
+        "raster-saturation": -0.12
+      }
+    }
+  ]
+} as const;
+
 const INITIAL_VIEW_STATE = {
   longitude: -1.35,
   latitude: 11.8,
@@ -67,7 +104,7 @@ const INITIAL_VIEW_STATE = {
 };
 
 type MapViewState = typeof INITIAL_VIEW_STATE;
-type TargetMapLayerMode = "no2" | "population";
+export type TargetMapLayerMode = "no2" | "population";
 type No2MapDisplayMetadata = No2MapTileMetadata | No2MapGridMetadata;
 type MapDataState =
   | { status: "loading" }
@@ -98,23 +135,27 @@ const AFFECTED_PWE_DENSITY_THRESHOLD = 50;
 const FILTERED_GRID_MIN_RADIUS_DEGREES = 0.65;
 const FILTERED_GRID_MAX_RADIUS_DEGREES = 1.35;
 
+export type TargetNpweiMapProps = {
+  filterActive?: boolean;
+  rows: CityNpweiRow[];
+  season: WebDataSeason;
+  year: number;
+  layerMode?: TargetMapLayerMode;
+};
+
 export function TargetNpweiMap({
   filterActive = false,
   rows,
   season,
   year,
   layerMode = "no2"
-}: {
-  filterActive?: boolean;
-  rows: CityNpweiRow[];
-  season: WebDataSeason;
-  year: number;
-  layerMode?: TargetMapLayerMode;
-}) {
+}: TargetNpweiMapProps) {
+  const { resolvedTheme } = useTheme();
   const [isClient, setIsClient] = useState(false);
   const [mapDataState, setMapDataState] = useState<MapDataState>({ status: "loading" });
   const [viewState, setViewState] = useState<MapViewState>(INITIAL_VIEW_STATE);
   const apiBaseUrl = getApiBaseUrl();
+  const mapStyle = resolvedTheme === "night" ? NIGHT_MAP_STYLE : DAY_MAP_STYLE;
 
   useEffect(() => {
     setIsClient(true);
@@ -141,48 +182,50 @@ export function TargetNpweiMap({
   }, [apiBaseUrl, season, year]);
 
   const visibleFeatureKeys = useMemo(() => new Set(rows.map((row) => featureKey(row.country, row.name))), [rows]);
-  const maskedGridData = useMemo(() => {
+  const westAfricaGridData = useMemo(() => {
     if (mapDataState.status !== "ready" || mapDataState.source !== "grid") return null;
-    const includeFeature = layerMode === "population" ? isPopulationFeature : isAffectedPweFeature;
 
     return {
       ...mapDataState.data,
-      features: mapDataState.data.features.filter((feature) => {
+      features: mapDataState.data.features.filter((feature) => isInsideWestAfricaBoundary(feature.properties ?? {}))
+    };
+  }, [mapDataState]);
+  const maskedGridData = useMemo(() => {
+    if (!westAfricaGridData) return null;
+    const includeFeature = layerMode === "population" ? isPopulationFeature : isAffectedPweFeature;
+
+    return {
+      ...westAfricaGridData,
+      features: westAfricaGridData.features.filter((feature) => {
         const properties = feature.properties ?? {};
-        return (
-          isInsideWestAfricaBoundary(properties) &&
-          includeFeature(properties) &&
-          isVisibleFeature(properties, visibleFeatureKeys, rows, filterActive)
-        );
+        return includeFeature(properties) && isVisibleFeature(properties, visibleFeatureKeys, rows, filterActive);
       })
     };
-  }, [filterActive, layerMode, mapDataState, rows, visibleFeatureKeys]);
+  }, [filterActive, layerMode, rows, visibleFeatureKeys, westAfricaGridData]);
   const clippedLog10ExposureRange = useMemo(() => {
-    if (mapDataState.status !== "ready" || mapDataState.source !== "grid") return null;
+    if (!westAfricaGridData) return null;
     return getClippedNumericRange(
-      mapDataState.data,
+      westAfricaGridData,
       "log10_pixel_exposure",
       0.02,
       0.98,
       (properties) =>
-        isInsideWestAfricaBoundary(properties) &&
         isAffectedPweFeature(properties) &&
         isVisibleFeature(properties, visibleFeatureKeys, rows, filterActive)
     );
-  }, [filterActive, mapDataState, rows, visibleFeatureKeys]);
+  }, [filterActive, rows, visibleFeatureKeys, westAfricaGridData]);
   const clippedPopulationRange = useMemo(() => {
-    if (mapDataState.status !== "ready" || mapDataState.source !== "grid") return null;
+    if (!filterActive || layerMode !== "population" || !westAfricaGridData) return null;
     return getClippedNumericRange(
-      mapDataState.data,
+      westAfricaGridData,
       "population_count",
       0.02,
       0.98,
       (properties) =>
-        isInsideWestAfricaBoundary(properties) &&
         isPopulationFeature(properties) &&
         isVisibleFeature(properties, visibleFeatureKeys, rows, filterActive)
     );
-  }, [filterActive, mapDataState, rows, visibleFeatureKeys]);
+  }, [filterActive, layerMode, rows, visibleFeatureKeys, westAfricaGridData]);
   const updateViewState = (nextViewState: Partial<MapViewState>) => {
     setViewState({
       ...INITIAL_VIEW_STATE,
@@ -206,7 +249,12 @@ export function TargetNpweiMap({
 
   const { metadata } = mapDataState;
   const seasonYearRanges = getNo2MapSeasonYearRanges(metadata, season, year);
-  const log10ExposureColorRange = clippedLog10ExposureRange ?? seasonYearRanges?.log10PixelExposure ?? metadata.log10PixelExposure;
+  const log10ExposureColorRange = getNo2MapDisplayLog10ExposureRange(
+    metadata,
+    season,
+    year,
+    mapDataState.source === "grid" ? clippedLog10ExposureRange : null
+  );
   const populationColorRange = clippedPopulationRange ?? seasonYearRanges?.populationCount ?? metadata.populationCount;
   if (!metadata.availableSeasons.includes(season)) {
     return <UnavailableMapPanel message={`Backend NO2 population grid is unavailable for ${season}.`} />;
@@ -266,7 +314,8 @@ export function TargetNpweiMap({
               rows,
               filterActive,
               log10ExposureColorRange,
-              populationColorRange
+              populationColorRange,
+              true
             ),
           updateTriggers: {
             getFillColor: [
@@ -315,7 +364,7 @@ export function TargetNpweiMap({
         getTooltip={({ object }) => {
           const properties = (object as DeckFeature | null)?.properties;
           if (!properties || !isVisibleFeature(properties, visibleFeatureKeys, rows, filterActive)) return null;
-          if (!isInsideWestAfricaBoundary(properties)) return null;
+          if (mapDataState.source !== "grid" && !isInsideWestAfricaBoundary(properties)) return null;
           if (layerMode === "no2" && !isAffectedPweFeature(properties)) return null;
           if (layerMode === "population" && !isPopulationFeature(properties)) return null;
           return {
@@ -329,7 +378,7 @@ export function TargetNpweiMap({
         }}
         viewState={viewState}
       >
-        <MapLibreMap mapLib={maplibregl as any} mapStyle={MAP_STYLE as any} reuseMaps>
+        <MapLibreMap mapLib={maplibregl as any} mapStyle={mapStyle as any} reuseMaps>
           <ScaleControl position="bottom-left" />
         </MapLibreMap>
       </DeckGL>
@@ -439,9 +488,10 @@ function getFeatureFillColor(
   rows: CityNpweiRow[],
   filterActive: boolean,
   log10ExposureRange: NumericRange,
-  populationRange: NumericRange
+  populationRange: NumericRange,
+  skipBoundaryCheck = false
 ) {
-  if (!isInsideWestAfricaBoundary(properties)) return [0, 0, 0, 0] as [number, number, number, number];
+  if (!skipBoundaryCheck && !isInsideWestAfricaBoundary(properties)) return [0, 0, 0, 0] as [number, number, number, number];
   if (!isVisibleFeature(properties, visibleFeatureKeys, rows, filterActive)) return [0, 0, 0, 0] as [number, number, number, number];
   if (layerMode === "population") {
     if (!isPopulationFeature(properties)) return [0, 0, 0, 0] as [number, number, number, number];

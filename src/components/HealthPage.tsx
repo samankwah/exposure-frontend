@@ -5,6 +5,7 @@ import Chart from "chart.js/auto";
 import type { ChartConfiguration } from "chart.js";
 import {
   AlertTriangle,
+  ArrowRight,
   Baby,
   Building2,
   CloudRain,
@@ -40,8 +41,10 @@ import {
 } from "@/data/webData";
 import { useBackendWebData } from "@/data/useWebData";
 import { BrandedNavbar } from "@/components/BrandedNavbar";
+import { useTheme } from "@/components/ThemeProvider";
 
 const ALL_CITIES = "all";
+const CITY_EXPOSURE_PAGE_SIZE = 16;
 
 export function HealthPage() {
   const { version: dataVersion } = useBackendWebData();
@@ -326,6 +329,10 @@ function HealthBarChart({
   values: number[];
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const { resolvedTheme } = useTheme();
+  const chartAxisColor = resolvedTheme === "night" ? "#7f94a8" : "#cbd5e1";
+  const chartGridColor = resolvedTheme === "night" ? "#243a50" : "#e7eef7";
+  const chartTickColor = resolvedTheme === "night" ? "#a7b8c7" : "#526b91";
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -364,13 +371,13 @@ function HealthBarChart({
         scales: {
           x: {
             border: {
-              color: "#cbd5e1"
+              color: chartAxisColor
             },
             grid: {
               display: false
             },
             ticks: {
-              color: "#526b91",
+              color: chartTickColor,
               font: {
                 size: 11,
                 weight: "700"
@@ -383,13 +390,13 @@ function HealthBarChart({
             beginAtZero: true,
             max,
             border: {
-              color: "#cbd5e1"
+              color: chartAxisColor
             },
             grid: {
-              color: "#e7eef7"
+              color: chartGridColor
             },
             ticks: {
-              color: "#526b91",
+              color: chartTickColor,
               count: 6,
               font: {
                 size: 11
@@ -403,7 +410,7 @@ function HealthBarChart({
 
     const chart = new Chart(canvasRef.current, config);
     return () => chart.destroy();
-  }, [colors, labels, max, values]);
+  }, [chartAxisColor, chartGridColor, chartTickColor, colors, labels, max, values]);
 
   return (
     <div className="health-chart-canvas-wrap">
@@ -423,6 +430,19 @@ function CityExposureGrid({
   season: WebDataSeason;
   totalCities: number;
 }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(rows.length / CITY_EXPOSURE_PAGE_SIZE));
+  const pageStart = (currentPage - 1) * CITY_EXPOSURE_PAGE_SIZE;
+  const pageEnd = Math.min(pageStart + CITY_EXPOSURE_PAGE_SIZE, rows.length);
+  const pageRows = useMemo(() => rows.slice(pageStart, pageEnd), [pageEnd, pageStart, rows]);
+  const pageItems = useMemo(() => getCityExposurePageItems(currentPage, totalPages), [currentPage, totalPages]);
+  const isFirstPage = currentPage === 1;
+  const isLastPage = currentPage === totalPages;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [cityFocus, rows.length, season]);
+
   return (
     <section className="health-panel city-exposure-section" aria-labelledby="city-exposure-title">
       <header className="health-panel-header">
@@ -433,7 +453,7 @@ function CityExposureGrid({
       </header>
 
       <div className="city-exposure-grid">
-        {rows.map((row) => (
+        {pageRows.map((row) => (
           <article className="city-exposure-card" key={row.name}>
             <header>
               <i aria-hidden style={{ backgroundColor: row.riskColor }} />
@@ -469,8 +489,108 @@ function CityExposureGrid({
           </article>
         ))}
       </div>
+
+      {totalPages > 1 ? (
+        <footer className="city-exposure-pagination" aria-label="City exposure pagination">
+          <p className="city-exposure-pagination-summary">
+            Showing {pageStart + 1}-{pageEnd} of {rows.length} cities
+          </p>
+
+          <div className="city-exposure-pagination-controls">
+            <button
+              aria-label="Go to first city exposure page"
+              className="city-exposure-page-button icon"
+              disabled={isFirstPage}
+              onClick={() => setCurrentPage(1)}
+              type="button"
+            >
+              <span className="city-exposure-page-double-icon mirror" aria-hidden>
+                <ArrowRight size={13} />
+                <ArrowRight size={13} />
+              </span>
+            </button>
+            <button
+              aria-label="Go to previous city exposure page"
+              className="city-exposure-page-button icon"
+              disabled={isFirstPage}
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              type="button"
+            >
+              <ArrowRight className="city-exposure-page-icon mirror" size={15} aria-hidden />
+            </button>
+
+            {pageItems.map((item) =>
+              typeof item === "number" ? (
+                <button
+                  aria-current={item === currentPage ? "page" : undefined}
+                  aria-label={`Go to city exposure page ${item}`}
+                  className={`city-exposure-page-button${item === currentPage ? " active" : ""}`}
+                  key={item}
+                  onClick={() => setCurrentPage(item)}
+                  type="button"
+                >
+                  {item}
+                </button>
+              ) : (
+                <span className="city-exposure-pagination-ellipsis" key={item} aria-hidden>
+                  ...
+                </span>
+              )
+            )}
+
+            <button
+              aria-label="Go to next city exposure page"
+              className="city-exposure-page-button icon"
+              disabled={isLastPage}
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              type="button"
+            >
+              <ArrowRight className="city-exposure-page-icon" size={15} aria-hidden />
+            </button>
+            <button
+              aria-label="Go to last city exposure page"
+              className="city-exposure-page-button icon"
+              disabled={isLastPage}
+              onClick={() => setCurrentPage(totalPages)}
+              type="button"
+            >
+              <span className="city-exposure-page-double-icon" aria-hidden>
+                <ArrowRight size={13} />
+                <ArrowRight size={13} />
+              </span>
+            </button>
+          </div>
+        </footer>
+      ) : null}
     </section>
   );
+}
+
+type CityExposurePageItem = number | "start-ellipsis" | "end-ellipsis";
+
+function getCityExposurePageItems(currentPage: number, totalPages: number): CityExposurePageItem[] {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const items: CityExposurePageItem[] = [1];
+  const windowStart = Math.max(2, currentPage - 1);
+  const windowEnd = Math.min(totalPages - 1, currentPage + 1);
+
+  if (windowStart > 2) {
+    items.push("start-ellipsis");
+  }
+
+  for (let page = windowStart; page <= windowEnd; page += 1) {
+    items.push(page);
+  }
+
+  if (windowEnd < totalPages - 1) {
+    items.push("end-ellipsis");
+  }
+
+  items.push(totalPages);
+  return items;
 }
 
 function HealthInsightGrid({ season }: { season: WebDataSeason }) {

@@ -19,20 +19,11 @@ interface ObservatoryContextValue {
   applyStagedFilters: () => void;
 }
 
-const YEARS = getWebDataYears();
-const defaultFilters: ObservatoryFilters = {
-  ...DEFAULT_FILTERS,
-  regionId: DEFAULT_FILTERS.regionId ?? "west-africa",
-  startYear: DEFAULT_FILTERS.startYear ?? YEARS[0],
-  endYear: DEFAULT_FILTERS.endYear ?? YEARS[YEARS.length - 1],
-  year: DEFAULT_FILTERS.endYear ?? YEARS[YEARS.length - 1]
-};
-
 const ObservatoryContext = createContext<ObservatoryContextValue | null>(null);
 
 export function ObservatoryProvider({ children }: { children: ReactNode }) {
-  const [filters, setFilterState] = useState<ObservatoryFilters>(defaultFilters);
-  const [stagedFilters, setStagedFilters] = useState<ObservatoryFilters>(defaultFilters);
+  const [filters, setFilterState] = useState<ObservatoryFilters>(() => getDefaultObservatoryFilters());
+  const [stagedFilters, setStagedFilters] = useState<ObservatoryFilters>(() => getDefaultObservatoryFilters());
 
   const setFilters: Dispatch<SetStateAction<ObservatoryFilters>> = useCallback((next) => {
     setFilterState((current) => {
@@ -61,6 +52,19 @@ export function useObservatoryFilters() {
     throw new Error("useObservatoryFilters must be used inside ObservatoryProvider");
   }
   return context;
+}
+
+function getDefaultObservatoryFilters(): ObservatoryFilters {
+  const years = getWebDataYears();
+  const latestYear = years[years.length - 1] ?? DEFAULT_FILTERS.year;
+
+  return {
+    ...DEFAULT_FILTERS,
+    regionId: DEFAULT_FILTERS.regionId ?? "west-africa",
+    startYear: years[0] ?? DEFAULT_FILTERS.startYear ?? latestYear,
+    endYear: latestYear,
+    year: latestYear
+  };
 }
 
 function normalizeFilters(filters: ObservatoryFilters): ObservatoryFilters {

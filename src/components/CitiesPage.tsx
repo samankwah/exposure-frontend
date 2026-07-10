@@ -20,6 +20,7 @@ import {
   type WebDataSeason
 } from "@/data/webData";
 import { useBackendWebData } from "@/data/useWebData";
+import { useTheme } from "@/components/ThemeProvider";
 
 const ALL_COUNTRIES = "all";
 const ALL_RISK_LEVELS = "all";
@@ -284,6 +285,10 @@ export function CitiesPage() {
 
 function CityNpweiChart({ rows }: { rows: CityNpweiRow[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { resolvedTheme } = useTheme();
+  const chartAxisColor = resolvedTheme === "night" ? "#7f94a8" : "#d8e4f2";
+  const chartGridColor = resolvedTheme === "night" ? "#243a50" : "#e7eef7";
+  const chartTickColor = resolvedTheme === "night" ? "#a7b8c7" : "#526b91";
   const labels = useMemo(() => rows.map((row) => row.name), [rows]);
   const values = useMemo(() => rows.map((row) => row.npwei), [rows]);
   const colors = useMemo(() => rows.map((row) => row.riskColor), [rows]);
@@ -323,13 +328,13 @@ function CityNpweiChart({ rows }: { rows: CityNpweiRow[] }) {
             beginAtZero: true,
             max: 100,
             border: {
-              color: "#d8e4f2"
+              color: chartAxisColor
             },
             grid: {
-              color: "#e7eef7"
+              color: chartGridColor
             },
             ticks: {
-              color: "#526b91",
+              color: chartTickColor,
               font: {
                 size: 10
               }
@@ -343,7 +348,7 @@ function CityNpweiChart({ rows }: { rows: CityNpweiRow[] }) {
               display: false
             },
             ticks: {
-              color: "#526b91",
+              color: chartTickColor,
               font: {
                 size: 10,
                 weight: "700"
@@ -356,7 +361,7 @@ function CityNpweiChart({ rows }: { rows: CityNpweiRow[] }) {
 
     const chart = new Chart(canvasRef.current, config);
     return () => chart.destroy();
-  }, [colors, labels, values]);
+  }, [chartAxisColor, chartGridColor, chartTickColor, colors, labels, values]);
 
   return (
     <div className="cities-chart-canvas-wrap">
@@ -367,6 +372,10 @@ function CityNpweiChart({ rows }: { rows: CityNpweiRow[] }) {
 
 function DryWetCityChart({ rows }: { rows: CityNpweiRow[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { resolvedTheme } = useTheme();
+  const chartAxisColor = resolvedTheme === "night" ? "#7f94a8" : "#d8e4f2";
+  const chartGridColor = resolvedTheme === "night" ? "#243a50" : "#e7eef7";
+  const chartTickColor = resolvedTheme === "night" ? "#a7b8c7" : "#526b91";
   const labels = useMemo(() => rows.map((row) => (row.name.length > 9 ? `${row.name.slice(0, 8)}...` : row.name)), [rows]);
   const djfValues = useMemo(() => rows.map((row) => row.djfNpwei), [rows]);
   const jjaValues = useMemo(() => rows.map((row) => row.jjaNpwei), [rows]);
@@ -404,7 +413,7 @@ function DryWetCityChart({ rows }: { rows: CityNpweiRow[] }) {
             labels: {
               boxHeight: 8,
               boxWidth: 8,
-              color: "#526b91",
+              color: chartTickColor,
               font: {
                 size: 10,
                 weight: "700"
@@ -427,7 +436,7 @@ function DryWetCityChart({ rows }: { rows: CityNpweiRow[] }) {
               display: false
             },
             ticks: {
-              color: "#526b91",
+              color: chartTickColor,
               font: {
                 size: 9
               },
@@ -439,13 +448,13 @@ function DryWetCityChart({ rows }: { rows: CityNpweiRow[] }) {
             beginAtZero: true,
             max: 100,
             border: {
-              color: "#d8e4f2"
+              color: chartAxisColor
             },
             grid: {
-              color: "#e7eef7"
+              color: chartGridColor
             },
             ticks: {
-              color: "#526b91",
+              color: chartTickColor,
               font: {
                 size: 10
               }
@@ -457,7 +466,7 @@ function DryWetCityChart({ rows }: { rows: CityNpweiRow[] }) {
 
     const chart = new Chart(canvasRef.current, config);
     return () => chart.destroy();
-  }, [djfValues, jjaValues, labels]);
+  }, [chartAxisColor, chartGridColor, chartTickColor, djfValues, jjaValues, labels]);
 
   return (
     <div className="cities-chart-canvas-wrap">

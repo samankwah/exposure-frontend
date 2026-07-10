@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
+import dynamic from "next/dynamic";
 import { BarChart3, Building2, Flame, HelpCircle, Lightbulb, Trophy, UsersRound, Wind } from "lucide-react";
 import { LineChart, MonthlyCycleChart } from "@/components/Charts";
 import { ObservatoryFooter } from "@/components/ObservatoryFooter";
 import { OverviewRankingTable } from "@/components/OverviewRankingTable";
-import { TargetNpweiMap } from "@/components/TargetNpweiMap";
+import { MapPanelSkeleton } from "@/components/Skeletons";
+import type { TargetNpweiMapProps } from "@/components/TargetNpweiMap";
 import { useObservatoryFilters } from "@/components/ObservatoryContext";
 import { useBackendWebData } from "@/data/useWebData";
 import type { Filters } from "@/types/exposure";
@@ -18,6 +20,14 @@ import {
   getOverviewSummaryMetrics,
   type CityNpweiRow
 } from "@/data/webData";
+
+const TargetNpweiMap = dynamic<TargetNpweiMapProps>(
+  () => import("@/components/TargetNpweiMap").then((module) => module.TargetNpweiMap),
+  {
+    ssr: false,
+    loading: () => <MapPanelSkeleton />
+  }
+);
 
 export function DashboardView() {
   const { filters } = useObservatoryFilters();

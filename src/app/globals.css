@@ -59,7 +59,7 @@ body {
 }
 
 html {
-  font-size: 17px;
+  font-size: 19px;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
@@ -5297,7 +5297,7 @@ body.mobile-nav-open {
 .insights-panel h2 {
   margin: 0;
   color: #64748b;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.06em;
 }
@@ -5306,7 +5306,7 @@ body.mobile-nav-open {
   margin: 0 0 14px;
   color: #94a3b8;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .insights-panel header > span {
@@ -5318,7 +5318,7 @@ body.mobile-nav-open {
   background: #f1f5f9;
   color: #64748b;
   padding: 0 10px;
-  font-size: 9px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -11592,8 +11592,8 @@ button.target-city-row.active {
 .trends-panel p,
 .insights-panel p,
 .insights-note p {
-  font-size: clamp(0.88rem, 0.84rem + 0.18vw, 1rem);
-  line-height: 1.55;
+  font-size: clamp(0.95rem, 0.9rem + 0.2vw, 1.08rem);
+  line-height: 1.6;
 }
 
 .contact-form-panel input,
@@ -11622,7 +11622,7 @@ button.target-city-row.active {
 
 @media (max-width: 760px) {
   html {
-    font-size: 16.5px;
+    font-size: 18px;
   }
 
   .data-page-shell,
@@ -11696,7 +11696,7 @@ button.target-city-row.active {
 
 @media (max-width: 420px) {
   html {
-    font-size: 16px;
+    font-size: 17px;
   }
 
   .home-page {
@@ -12910,6 +12910,74 @@ html[data-theme="night"] :where(
   .home-explore-menu
 ) {
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42) !important;
+}
+
+/* Night-mode contrast repairs: elements that kept light-theme hardcoded colours
+   (or a light surface) and fell below WCAG AA against the dark panels. */
+
+/* Dark-on-dark text: hardcoded near-black that never got a night value. */
+html[data-theme="night"] .health-tier-meter-row > span {
+  color: var(--theme-text) !important;
+}
+
+/* Muted greys that are readable on white but not on the dark panels. */
+html[data-theme="night"] .health-tier-meter-row small,
+html[data-theme="night"] .health-filter-panel label span,
+html[data-theme="night"] .home-risk-range,
+html[data-theme="night"] .target-city-head,
+html[data-theme="night"] .target-city-head span,
+html[data-theme="night"] .target-city-row span:nth-child(2) {
+  color: var(--theme-muted) !important;
+}
+
+/* Mid-blues tuned for a white background; too dark against the dark panels. */
+html[data-theme="night"] .target-map-slider b,
+html[data-theme="night"] .target-map-kpi strong.blue,
+html[data-theme="night"] .target-map-kpi small.blue,
+html[data-theme="night"] .home-section-kicker,
+html[data-theme="night"] .home-section-kicker strong,
+html[data-theme="night"] .home-section-kicker span,
+html[data-theme="night"] .home-section-kicker-dark,
+html[data-theme="night"] .home-section-kicker-dark strong,
+html[data-theme="night"] .home-section-kicker-dark span {
+  color: var(--theme-accent) !important;
+}
+
+/* Saturated reds sit too close to the dark surfaces. */
+html[data-theme="night"] .home-risk-row .home-risk-label strong,
+html[data-theme="night"] .target-city-score b {
+  color: #fb7185 !important;
+}
+
+/* Light surfaces that survived into night mode, leaving pale text on white. */
+html[data-theme="night"] .home-all-articles {
+  border-color: var(--theme-line) !important;
+  background: var(--theme-surface-raised) !important;
+  color: var(--theme-accent) !important;
+}
+
+html[data-theme="night"] .home-all-articles:hover,
+html[data-theme="night"] .home-all-articles:focus-visible {
+  border-color: var(--theme-accent) !important;
+  background: var(--theme-surface-soft) !important;
+}
+
+html[data-theme="night"] .data-panel-header > span {
+  border-color: var(--theme-line) !important;
+  background: var(--theme-surface-soft) !important;
+  color: var(--theme-muted) !important;
+}
+
+/* White-on-accent badges: deepen the fill so the white label clears AA. */
+html[data-theme="night"] .health-page .city-exposure-page-button.active {
+  background: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
+  color: #ffffff !important;
+}
+
+/* Pale accent badge with white text — keep the fill, darken the numeral. */
+html[data-theme="night"] .about-method-card span {
+  color: #08131f !important;
 }
 
 @media print {

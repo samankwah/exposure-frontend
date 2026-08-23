@@ -15,15 +15,13 @@ import {
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { BrandedNavbar } from "@/components/BrandedNavbar";
-import {
-  getCityRows,
-  getCountryRows,
-  getWebDataObservationPeriod,
-  getWebDataYearRange
-} from "@/data/webData";
+import { getCityRows, getCountryRows } from "@/data/webData";
 
-const yearRange = getWebDataYearRange();
-const observationPeriod = getWebDataObservationPeriod();
+// The bundled snapshot still ends at 2024; the backend now covers through 2025.
+// This page is a server component, so it renders the bundled value at import time
+// and never picks up the live range the way the client pages do.
+const yearRange = "2020-2025";
+const observationPeriod = "Jan 2020-Dec 2025";
 const cityCount = getCityRows("Annual").length;
 const countryCount = getCountryRows("Annual").length;
 const platformBadges = [

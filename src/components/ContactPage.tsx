@@ -22,7 +22,7 @@ export function ContactPage() {
               Contact
             </span>
             <h1 id="contact-title">Contact the CLeNE Research Team</h1>
-            <p>Questions about data, methodology, partnerships, or technical issues can be sent directly to CAHL.</p>
+            <p>Questions about data, methodology, partnerships, or technical issues can be sent directly to AtmosTech Lab.</p>
           </header>
 
           <section className="contact-layout" aria-label="Contact form and details">
@@ -32,7 +32,7 @@ export function ContactPage() {
                 <p>Your email client will open with the message details.</p>
               </header>
 
-              <form action="mailto:cahl@knust.edu.gh" encType="text/plain" method="post">
+              <form action="mailto:atmostechlab@knust.edu.gh" encType="text/plain" method="post">
                 <div className="contact-form-grid">
                   <label>
                     <span>Name</span>
@@ -84,14 +84,14 @@ export function ContactPage() {
             <aside className="contact-info-panel" aria-label="Contact details">
               <div>
                 <h2>Contact Details</h2>
-                <p>Climate and Health Research Lab, KNUST.</p>
+                <p>AtmosTech Lab, KNUST.</p>
               </div>
 
-              <a className="contact-info-link" href="mailto:cahl@knust.edu.gh">
+              <a className="contact-info-link" href="mailto:atmostechlab@knust.edu.gh">
                 <Mail size={17} aria-hidden />
                 <span>
                   <strong>Email</strong>
-                  cahl@knust.edu.gh
+                  atmostechlab@knust.edu.gh
                 </span>
               </a>
 

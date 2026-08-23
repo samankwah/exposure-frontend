@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CloudSun, Database, ExternalLink, Mail, Map, ShieldCheck } from "lucide-react";
+import { CloudSun, Database, ExternalLink, Linkedin, Mail, Map, ShieldCheck } from "lucide-react";
 import { getCityRows, getWebDataYearRange } from "@/data/webData";
 import { useBackendWebData } from "@/data/useWebData";
 
@@ -48,6 +48,17 @@ export function ObservatoryFooter({ variant = "app" }: { variant?: "app" | "site
             <span>{yearRange}</span>
             <span>{cityCount} cities</span>
           </div>
+          <div className="footer-social" aria-label="AtmosTech Lab social media">
+            <a
+              href="https://www.linkedin.com/company/atmostech-lab/"
+              rel="noreferrer"
+              target="_blank"
+              aria-label="AtmosTech Lab on LinkedIn"
+              title="AtmosTech Lab on LinkedIn"
+            >
+              <Linkedin size={17} aria-hidden />
+            </a>
+          </div>
         </section>
 
         <nav className="footer-nav" aria-labelledby="footer-platform-title">
@@ -82,15 +93,15 @@ export function ObservatoryFooter({ variant = "app" }: { variant?: "app" | "site
             <ShieldCheck size={18} aria-hidden />
             <p>NO{"\u2082"} columns are not direct surface concentrations, clinical outcomes, or regulatory certification.</p>
           </div>
-          <a className="footer-contact-link" href="mailto:cahl@knust.edu.gh">
+          <a className="footer-contact-link" href="mailto:atmostechlab@knust.edu.gh">
             <Mail size={17} aria-hidden />
-            <span>cahl@knust.edu.gh</span>
+            <span>atmostechlab@knust.edu.gh</span>
           </a>
         </section>
       </div>
 
       <div className="footer-bottom">
-        <p>Copyright {currentYear} Climate and Health Research Lab, KNUST. All rights reserved.</p>
+        <p>Copyright {currentYear} AtmosTech Lab, KNUST. All rights reserved.</p>
         <div>
           <span>
             <Map size={14} aria-hidden />

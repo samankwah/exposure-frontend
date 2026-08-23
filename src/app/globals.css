@@ -1384,6 +1384,33 @@ a {
   white-space: nowrap;
 }
 
+.footer-social {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer-social a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(143, 209, 231, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #dff5fb;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.footer-social a:hover,
+.footer-social a:focus-visible {
+  border-color: rgba(143, 209, 231, 0.5);
+  background: rgba(142, 214, 236, 0.16);
+  color: #ffffff;
+}
+
 .footer-nav h2,
 .footer-disclosure h2 {
   margin: 0 0 14px;

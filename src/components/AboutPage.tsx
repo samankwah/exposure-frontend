@@ -32,7 +32,7 @@ const platformBadges = [
   yearRange,
   `${cityCount} Cities`,
   `${countryCount} Countries`,
-  "KNUST CAHL"
+  "KNUST AtmosTech Lab"
 ];
 
 const dataSources = [
@@ -76,10 +76,10 @@ const aboutCards: Array<{ body: ReactNode; icon: LucideIcon; title: string }> = 
   {
     body: (
       <>
-        Developed by the <strong>Climate and Health Research Lab (CAHL)</strong> at KNUST, Kumasi, Ghana. CAHL focuses on climate variability, air quality, and population health across sub-Saharan Africa.
+        Developed by the <strong>AtmosTech Lab</strong> at KNUST, Kumasi, Ghana. AtmosTech Lab focuses on climate variability, air quality, and population health across sub-Saharan Africa.
         <br />
         <br />
-        Contact: <a href="mailto:cahl@knust.edu.gh">cahl@knust.edu.gh</a>
+        Contact: <a href="mailto:atmostechlab@knust.edu.gh">atmostechlab@knust.edu.gh</a>
       </>
     ),
     icon: Landmark,
@@ -144,7 +144,7 @@ export function AboutPage() {
               <h1 id="about-title">CLeNE - West Africa NO{"\u2082"} Exposure Intelligence Platform</h1>
               <p>
                 An open-access satellite-derived dashboard tracking population-weighted NO{"\u2082"} exposure across West
-                African urban centres from {yearRange}. Built by the Climate and Health Research Lab (CAHL) at KNUST,
+                African urban centres from {yearRange}. Built by the AtmosTech Lab at KNUST,
                 Kumasi, Ghana.
               </p>
               <div className="about-badge-row" aria-label="Platform coverage">
@@ -224,11 +224,11 @@ export function AboutPage() {
               <MessageCircle size={15} aria-hidden />
               <div>
                 <h2 id="about-feedback-title">Share Your Feedback</h2>
-                <p>Help us improve this platform. Your comments are valuable to the research team at CAHL KNUST.</p>
+                <p>Help us improve this platform. Your comments are valuable to the research team at AtmosTech Lab, KNUST.</p>
               </div>
             </header>
 
-            <form action="mailto:cahl@knust.edu.gh" encType="text/plain" method="post">
+            <form action="mailto:atmostechlab@knust.edu.gh" encType="text/plain" method="post">
               <fieldset className="about-rating-field">
                 <legend>How would you rate this platform?</legend>
                 <div className="about-rating-row">
@@ -276,7 +276,7 @@ export function AboutPage() {
               </button>
               <p className="about-feedback-contact">
                 <Mail size={13} aria-hidden />
-                Feedback opens your email client and sends to cahl@knust.edu.gh.
+                Feedback opens your email client and sends to atmostechlab@knust.edu.gh.
               </p>
             </form>
           </section>

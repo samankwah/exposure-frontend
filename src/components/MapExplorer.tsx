@@ -8,6 +8,7 @@ import { MapPanelSkeleton } from "@/components/Skeletons";
 import type { TargetNpweiMapProps } from "@/components/TargetNpweiMap";
 import type { Filters, Season } from "@/types/exposure";
 import {
+  OBSERVATION_YEAR_RANGE,
   SEASON_LABELS,
   getLocalCityRows,
   getLocalCountryRows,
@@ -99,7 +100,7 @@ export function MapExplorer() {
   const topCity = tableRows[0];
   const weightedNpwei = getUrbanWeightedNpwei(visibleCountryRows);
   const totalUrbanPopulation = visibleCountryRows.reduce((total, row) => total + row.urbanPopulationMillions, 0);
-  const years = getYearsLabel(displayYears);
+  const years = OBSERVATION_YEAR_RANGE;
   const patchFilters = (next: Partial<Filters>) => {
     setFilters((current) => ({ ...current, ...next }));
   };
@@ -213,9 +214,6 @@ export function MapExplorer() {
               season={season}
               year={MAP_BACKEND_REQUEST_YEAR}
             />
-            <div className="target-pop-layer-note">
-              {visualLayer === "population" ? "Population count" : "PWE = NO2 x Population"}
-            </div>
           </div>
         </article>
 
@@ -419,8 +417,3 @@ function slugId(value: string) {
     .replace(/^-|-$/g, "");
 }
 
-function getYearsLabel(years: number[]) {
-  if (years.length === 0) return "No generated years";
-  if (years.length === 1) return String(years[0]);
-  return `${years[0]}-${years[years.length - 1]}`;
-}

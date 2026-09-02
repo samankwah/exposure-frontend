@@ -138,7 +138,7 @@ const riskToneAliases: Record<LegacyRiskTone, RiskTone> = {
 export const WEB_DATA_SEASONS = ["Annual", "DJF", "JJA"] as const satisfies readonly WebDataSeason[];
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 export const NO2_COLUMN_UNIT = "x10^15 molecules cm^-2";
-export const NO2_COLUMN_UNIT_LABEL = "\u00d710^15 molecules cm\u207b\u00b2";
+export const NO2_COLUMN_UNIT_LABEL = "\u00d710\u00b9\u2075 molecules cm\u207b\u00b2";
 
 const riskTiers: Array<{ color: string; label: RiskTierLabel; min: number; tone: RiskTone }> = [
   { label: "Very High", min: 80, color: "#ef4444", tone: "very-high" },
@@ -405,29 +405,18 @@ function getWebDataYearsFromSnapshot(snapshot: WebDataSnapshot) {
   return years.length > 0 ? [...years].sort((a, b) => a - b) : [2020, 2021, 2022, 2023, 2024];
 }
 
+// Published observation window. The generated dataset cache still begins at 2020,
+// so these display strings are pinned here instead of derived from years_covered.
+// Data-driven behaviour (filters, sliders, trends) still uses getWebDataYears().
+export const OBSERVATION_YEAR_RANGE = "2019-2025";
+export const OBSERVATION_PERIOD = "Jan 2019-Dec 2025";
+
 export function getWebDataYearRange() {
-  const years = getWebDataYears();
-  if (years.length === 0) return "No generated years";
-  if (years.length === 1) return String(years[0]);
-  return `${years[0]}-${years[years.length - 1]}`;
+  return OBSERVATION_YEAR_RANGE;
 }
 
 export function getWebDataObservationPeriod() {
-  const monthsByYear = getActiveWebDataSnapshot().summary.months_by_year;
-  if (!monthsByYear) return getWebDataYearRange();
-
-  const entries = Object.entries(monthsByYear)
-    .map(([year, months]) => ({ year: Number(year), months: [...months].sort((a, b) => a - b) }))
-    .filter((entry) => Number.isFinite(entry.year) && entry.months.length > 0)
-    .sort((a, b) => a.year - b.year);
-
-  if (entries.length === 0) return getWebDataYearRange();
-
-  const first = entries[0];
-  const last = entries[entries.length - 1];
-  const firstMonth = MONTHS[Math.max(0, Math.min(11, first.months[0] - 1))];
-  const lastMonth = MONTHS[Math.max(0, Math.min(11, last.months[last.months.length - 1] - 1))];
-  return `${firstMonth} ${first.year}-${lastMonth} ${last.year}`;
+  return OBSERVATION_PERIOD;
 }
 
 export function getDefaultWebDataFilters(): Filters {

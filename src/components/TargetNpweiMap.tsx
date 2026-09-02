@@ -26,16 +26,16 @@ import { NO2_COLUMN_UNIT_LABEL, pweToColumn, type CityNpweiRow, type WebDataSeas
 const DAY_MAP_STYLE = {
   version: 8,
   sources: {
-    "carto-light": {
+    "osm-light": {
       type: "raster",
       tiles: [
-        "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
+        "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png"
       ],
       tileSize: 256,
-      attribution: "&copy; CARTO"
+      maxzoom: 19,
+      attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors"
     }
   },
   layers: [
@@ -47,9 +47,9 @@ const DAY_MAP_STYLE = {
       }
     },
     {
-      id: "carto-light",
+      id: "osm-light",
       type: "raster",
-      source: "carto-light",
+      source: "osm-light",
       paint: {
         "raster-opacity": 0.94,
         "raster-saturation": -0.2
@@ -61,16 +61,16 @@ const DAY_MAP_STYLE = {
 const NIGHT_MAP_STYLE = {
   version: 8,
   sources: {
-    "carto-dark": {
+    "osm-dark": {
       type: "raster",
       tiles: [
-        "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-        "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-        "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-        "https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
+        "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png"
       ],
       tileSize: 256,
-      attribution: "&copy; CARTO"
+      maxzoom: 19,
+      attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors"
     }
   },
   layers: [
@@ -82,12 +82,14 @@ const NIGHT_MAP_STYLE = {
       }
     },
     {
-      id: "carto-dark",
+      id: "osm-dark",
       type: "raster",
-      source: "carto-dark",
+      source: "osm-dark",
       paint: {
         "raster-opacity": 0.9,
-        "raster-saturation": -0.12
+        "raster-saturation": -0.5,
+        "raster-brightness-max": 0.45,
+        "raster-contrast": 0.15
       }
     }
   ]
@@ -418,12 +420,14 @@ function No2MapLegend({
   populationRange: NumericRange;
 }) {
   const range = layerMode === "population" ? populationRange : log10ExposureRange;
-  const title = layerMode === "population" ? "Population count" : "PWE = NO2 x Population, Log Scale";
+  // The exposure ramp is labelled by its 10^n values alone; only the population
+  // layer still needs a header to say what is being counted.
+  const title = layerMode === "population" ? "Population count" : null;
   const middle = range.min + (range.max - range.min) / 2;
 
   return (
     <div className={layerMode === "population" ? "target-map-legend population" : "target-map-legend"} aria-hidden>
-      <strong>{title}</strong>
+      {title ? <strong>{title}</strong> : null}
       <i />
       <div className="target-map-legend-labels">
         <span className="target-map-legend-end target-map-legend-low">Low</span>
@@ -595,7 +599,7 @@ function getTooltipHtml(properties: No2TileProperties, metadata: No2MapDisplayMe
     renderTooltipRow("NO₂ column", formatNo2ColumnHtml(Number(properties.no2_column_molec_cm2 ?? 0))),
     renderTooltipRow("Population", escapeHtml(formatWholeNumber(Number(properties.population_count ?? 0)))),
     renderTooltipRow("Pixel exposure", formatScientificHtml(Number(properties.pixel_exposure ?? 0), metadata.units.pixelExposure)),
-    renderTooltipRow("Log exposure", escapeHtml(formatNumber(Number(properties.log10_pixel_exposure ?? 0), 2))),
+    renderTooltipRow("Log exposure", formatLogExposureHtml(Number(properties.log10_pixel_exposure ?? 0))),
     `</div>`,
     `<div class="target-map-tooltip-footer">PWE = NO₂ &times; population</div>`
   ].join("");
@@ -736,7 +740,20 @@ function getQuantile(sortedValues: number[], percentile: number) {
 
 function formatLegendValue(value: number, layerMode: TargetMapLayerMode) {
   if (layerMode === "population") return formatCompactNumber(value);
-  return formatNumber(value, 1);
+  // The exposure scale is log10, so label the ramp in powers of ten
+  // (13.3 reads as 10^13) rather than as a bare decimal.
+  if (!Number.isFinite(value)) return "No data";
+  return (
+    <>
+      10<sup>{Math.round(value)}</sup>
+    </>
+  );
+}
+
+function formatLogExposureHtml(value: number) {
+  // Same log10 value the legend labels, shown as a power of ten (13.28 -> 10^13.28).
+  if (!Number.isFinite(value)) return "No data";
+  return `10<sup>${escapeHtml(formatNumber(value, 2))}</sup>`;
 }
 
 function formatScientificHtml(value: number, units: string) {

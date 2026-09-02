@@ -6655,6 +6655,8 @@ button.map-ranking-row.active {
 }
 
 .target-season-tabs button {
+  flex: 0 0 auto;
+  white-space: nowrap;
   min-width: 42px;
   min-height: 25px;
   border: 0;
@@ -6837,6 +6839,13 @@ button.map-ranking-row.active {
   white-space: nowrap;
 }
 
+/* Keep the power-of-ten exponent from growing the label's line box. */
+.target-map-legend-value sup {
+  font-size: 0.78em;
+  line-height: 0;
+  vertical-align: super;
+}
+
 .target-map-legend-end {
   top: 0;
   text-transform: uppercase;
@@ -6882,20 +6891,6 @@ button.map-ranking-row.active {
   color: #5d7291;
   font-size: 0.78rem;
   line-height: 1.5;
-}
-
-.target-pop-layer-note {
-  position: absolute;
-  z-index: 21;
-  top: 12px;
-  right: 12px;
-  border: 1px solid #d8e4f2;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.94);
-  color: #466292;
-  padding: 5px 8px;
-  font-size: 0.64rem;
-  font-weight: 900;
 }
 
 .target-city-panel {
@@ -7075,7 +7070,7 @@ button.target-city-row.active {
   }
 
   .target-season-tabs button {
-    flex: 1 1 0;
+    flex: 1 1 auto;
   }
 
   .target-map-surface .map-panel {
@@ -12159,13 +12154,6 @@ html[data-theme="night"] .map-zoom-controls,
 html[data-theme="night"] .map-layer-button,
 html[data-theme="night"] .map-legend,
 html[data-theme="night"] .column-map-legend,
-html[data-theme="night"] .target-pop-layer-note {
-  border-color: rgba(95, 122, 145, 0.72);
-  background: rgba(15, 29, 44, 0.94);
-  color: var(--text);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
-}
-
 html[data-theme="night"] .map-zoom-controls button {
   color: var(--text);
 }

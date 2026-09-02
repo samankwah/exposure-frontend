@@ -205,7 +205,7 @@ describe("backend web_data client", () => {
 
   it("formats PWE in scaled NO2 column display units", () => {
     expect(NO2_COLUMN_UNIT).toBe("x10^15 molecules cm^-2");
-    expect(NO2_COLUMN_UNIT_LABEL).toBe("\u00d710^15 molecules cm\u207b\u00b2");
+    expect(NO2_COLUMN_UNIT_LABEL).toBe("\u00d710\u00b9\u2075 molecules cm\u207b\u00b2");
     expect(formatPwe(3_354_604_383_762_359)).toBe(`3.35 ${NO2_COLUMN_UNIT_LABEL}`);
   });
 
@@ -683,7 +683,9 @@ describe("backend web_data client", () => {
     expect(source).toContain("Log exposure");
     expect(source).not.toContain("text: getTooltipText");
     expect(source).not.toContain("log10(pixel_exposure)");
-    expect(source).toContain("PWE = NO2 x Population, Log Scale");
+    expect(source).not.toContain("PWE = NO2 x Population, Log Scale");
+    expect(source).toContain('layerMode === "population" ? "Population count" : null');
+    expect(source).toContain("10<sup>{Math.round(value)}</sup>");
     expect(source).toContain('"background-color": "#ffffff"');
     expect(source).toContain('opacity: layerMode === "population" ? 0.76 : 0.94');
     expect(source).toContain('opacity: layerMode === "population" ? 0.72 : 0.96');
@@ -696,8 +698,8 @@ describe("backend web_data client", () => {
     expect(source).not.toContain("getLegendTicks(range, layerMode)");
     expect(source).toContain("DAY_MAP_STYLE");
     expect(source).toContain("NIGHT_MAP_STYLE");
-    expect(source).toContain("light_all/{z}/{x}/{y}.png");
-    expect(source).toContain("dark_all/{z}/{x}/{y}.png");
+    expect(source).toContain("tile.openstreetmap.org/{z}/{x}/{y}.png");
+    expect(source).not.toContain("basemaps.cartocdn.com");
     expect(source).toContain('resolvedTheme === "night" ? NIGHT_MAP_STYLE : DAY_MAP_STYLE');
     expect(source).not.toContain("local-country-context-fill");
     expect(source).not.toContain("local-country-labels");
@@ -709,7 +711,7 @@ describe("backend web_data client", () => {
     expect(source).not.toContain("interpolateExposureCell");
     expect(source).not.toContain("SUPPLEMENTAL_EXPOSURE_SOURCES");
     expect(source).not.toContain("@/data/sampleData");
-    expect(source).toContain("basemaps.cartocdn.com");
+    expect(source).toContain("tile.openstreetmap.org");
     expect(mapExplorerSource).toContain('import dynamic from "next/dynamic";');
     expect(mapExplorerSource).toContain('import type { TargetNpweiMapProps } from "@/components/TargetNpweiMap";');
     expect(mapExplorerSource).toContain('() => import("@/components/TargetNpweiMap").then((module) => module.TargetNpweiMap)');
@@ -819,14 +821,14 @@ describe("backend web_data client", () => {
     expect(homeSource).not.toContain("@/data/sampleData");
   });
 
-  it("shows the homepage observation year range as 2020 - 2025 without changing population baseline copy", () => {
+  it("shows the homepage observation year range as 2019 - 2025 without changing population baseline copy", () => {
     const homeSource = readFileSync(join(process.cwd(), "src", "app", "page.tsx"), "utf-8");
 
-    expect(homeSource).toContain('const HOMEPAGE_OBSERVATION_YEAR_RANGE = "2020 - 2025";');
+    expect(homeSource).toContain('const HOMEPAGE_OBSERVATION_YEAR_RANGE = "2019 - 2025";');
     expect(homeSource).toContain('value: yearRange, label: "TROPOMI Observations"');
     expect(homeSource).toContain("{yearRange} exposure trend");
     expect(homeSource).toContain("NASA Gridded 2020 population raster");
-    expect(homeSource).not.toContain('const HOMEPAGE_OBSERVATION_YEAR_RANGE = "2020-2025";');
+    expect(homeSource).not.toContain('const HOMEPAGE_OBSERVATION_YEAR_RANGE = "2019-2025";');
   });
 
 });

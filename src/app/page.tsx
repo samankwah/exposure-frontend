@@ -37,7 +37,7 @@ type InsightVisualKind = "monthly" | "annual" | "ranking";
 
 const webDataSummary = getWebDataSummary();
 const annualHealthSummary = getHealthSeasonSummary("Annual");
-const HOMEPAGE_OBSERVATION_YEAR_RANGE = "2020 - 2025";
+const HOMEPAGE_OBSERVATION_YEAR_RANGE = "2019 - 2025";
 const yearRange = HOMEPAGE_OBSERVATION_YEAR_RANGE;
 const observationPeriod = getWebDataObservationPeriod();
 const urbanPopulationMillions = webDataSummary.total_urban_population / 1_000_000;
@@ -396,7 +396,7 @@ function AnnualTrendChart({ data }: { data: TrendPoint[] }) {
       {data.map((point, index) => (
         <circle className="chart-dot-no2" cx={xFor(index)} cy={no2Scale(point.no2 ?? 0)} key={point.label} r="4" />
       ))}
-      <ChartYAxisLabels frame={frame} values={no2Values} suffix="" />
+      <ChartYAxisLabels frame={frame} title={NO2_COLUMN_UNIT_LABEL} values={no2Values} suffix="" />
       <g className="chart-axis">
         {data.map((point, index) => (
           <text key={point.label} textAnchor="middle" x={xFor(index)} y={frame.bottom + 24}>

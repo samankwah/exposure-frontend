@@ -5,11 +5,9 @@ import {
   AnnualNpweiTrendChart,
   CityHotspotsChart,
   CountryRankingChart,
-  RiskTierChart,
-  SeasonalCycleChart
+  RiskTierChart
 } from "@/components/Charts";
 import {
-  getAverageCityNpwei,
   getCityRows,
   getCountryRows,
   getHealthSeasonSummary,
@@ -18,7 +16,6 @@ import {
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
-  CalendarDays,
   Factory,
   Satellite,
   Sprout,
@@ -30,7 +27,6 @@ import {
 export function InsightsDetailPage() {
   const annualHealth = getHealthSeasonSummary("Annual");
   const topCity = getCityRows("Annual")[0];
-  const dryWetGap = Math.round(getAverageCityNpwei("DJF") - getAverageCityNpwei("JJA"));
   const yearRange = getWebDataYearRange();
   const cityCount = getCityRows("Annual").length;
   const countryCount = getCountryRows("Annual").length;
@@ -80,13 +76,6 @@ export function InsightsDetailPage() {
               meta="NPWEI >= 60"
               value={`${annualHealth.high_risk_population_millions.toFixed(1)}M`}
             />
-            <InsightKpi
-              accent="green"
-              icon={CalendarDays}
-              label="Dry-Wet Season Gap"
-              meta="DJF vs JJA average"
-              value={`${dryWetGap >= 0 ? "+" : ""}${dryWetGap} pts`}
-            />
           </section>
 
           <section className="insights-chart-grid" aria-label="Exposure charts">
@@ -103,13 +92,6 @@ export function InsightsDetailPage() {
               title="Country Rankings"
             >
               <CountryRankingChart />
-            </InsightPanel>
-            <InsightPanel
-              label="Dry vs Wet"
-              subtitle="Monthly NPWEI pattern - West Africa"
-              title="Seasonal Cycle"
-            >
-              <SeasonalCycleChart />
             </InsightPanel>
           </section>
 

@@ -397,24 +397,27 @@ async function hasNo2MapInitialTileCoverage(
   const urls = buildNo2InitialTileProbeUrls(metadata, season, year, apiBaseUrl);
   if (urls.length === 0) return true;
 
+  // One tile with data proves the tile set exists. Empty tiles (204) are normal
+  // over desert or ocean, so only fall back on a missing tile (404) or when
+  // every probe comes back empty.
   return new Promise<boolean>((resolve, reject) => {
     let remaining = urls.length;
     let settled = false;
 
     urls.forEach((url) => {
       probeNo2MapTileCoverage(fetcher, url).then(
-        (covered) => {
+        (coverage) => {
           if (settled) return;
-          if (!covered) {
+          if (coverage === "data" || coverage === "missing") {
             settled = true;
-            resolve(false);
+            resolve(coverage === "data");
             return;
           }
 
           remaining -= 1;
           if (remaining === 0) {
             settled = true;
-            resolve(true);
+            resolve(false);
           }
         },
         (error: unknown) => {
@@ -427,7 +430,7 @@ async function hasNo2MapInitialTileCoverage(
   });
 }
 
-async function probeNo2MapTileCoverage(fetcher: typeof fetch, url: string) {
+async function probeNo2MapTileCoverage(fetcher: typeof fetch, url: string): Promise<"data" | "empty" | "missing"> {
   const response = await fetcher(url, {
     cache: "no-store",
     headers: {
@@ -436,9 +439,10 @@ async function probeNo2MapTileCoverage(fetcher: typeof fetch, url: string) {
   });
 
   await cancelNo2MapTileProbeBody(response);
-  if (response.status === 204 || response.status === 404) return false;
+  if (response.status === 404) return "missing";
+  if (response.status === 204) return "empty";
   if (!response.ok) throw new Error(`NO2 map tile probe request failed with ${response.status}`);
-  return true;
+  return "data";
 }
 
 async function cancelNo2MapTileProbeBody(response: Response) {

@@ -20,6 +20,8 @@ import type {
   LayerKey,
 } from "@/types/exposure";
 import africaContourMap from "@/data/africaContourMap.json";
+import { getLocationLabelAtPoint } from "@/data/countryLookup";
+import { buildEsriMapStyle } from "@/data/esriBasemap";
 import westAfricaBoundary from "@/data/westAfricaBoundary.json";
 import {
   CITIES,
@@ -32,40 +34,7 @@ import {
   toNo2ColumnValue,
 } from "@/data/sampleData";
 
-const MAP_STYLE = {
-  version: 8,
-  sources: {
-    "carto-light": {
-      type: "raster",
-      tiles: [
-        "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-        "https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-      ],
-      tileSize: 256,
-      attribution: "&copy; CARTO",
-    },
-  },
-  layers: [
-    {
-      id: "local-background",
-      type: "background",
-      paint: {
-        "background-color": "#ffffff",
-      },
-    },
-    {
-      id: "carto-light",
-      type: "raster",
-      source: "carto-light",
-      paint: {
-        "raster-opacity": 0.92,
-        "raster-saturation": -0.2,
-      },
-    },
-  ],
-} as const;
+const MAP_STYLE = buildEsriMapStyle("World_Light_Gray", "#ffffff");
 
 const INITIAL_VIEW_STATE = {
   longitude: 6.5,
@@ -455,7 +424,7 @@ export function ExposureMap({
         getCursor={({ isDragging, isHovering }) =>
           isDragging ? "grabbing" : isHovering ? "pointer" : "grab"
         }
-        getTooltip={({ object }) => {
+        getTooltip={({ object, coordinate }) => {
           if (!object) return null;
           if ((object as FireActivityPoint).frp) {
             const point = object as FireActivityPoint;
@@ -465,8 +434,11 @@ export function ExposureMap({
           }
           if ((object as any).properties?.column) {
             const feature = object as any;
+            const locationLabel =
+              (coordinate ? getLocationLabelAtPoint([coordinate[0], coordinate[1]]) : null) ??
+              feature.properties.countryName;
             return {
-              text: `${feature.properties.countryName}\nInterpolated NO2 ${Number(feature.properties.column).toFixed(2)} ${NO2_COLUMN_UNIT_LABEL}\nResolution ${feature.properties.resolutionKm} km`,
+              text: `${locationLabel}\nInterpolated NO2 ${Number(feature.properties.column).toFixed(2)} ${NO2_COLUMN_UNIT_LABEL}\nResolution ${feature.properties.resolutionKm} km`,
             };
           }
           if ((object as Hotspot).coordinates) {

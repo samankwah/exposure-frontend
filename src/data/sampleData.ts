@@ -16,6 +16,7 @@ import type {
 } from "@/types/exposure";
 import { NO2_COLUMN_UNIT, NO2_COLUMN_UNIT_LABEL } from "@/data/webData";
 import westAfricaBoundary from "./westAfricaBoundary.json";
+import { getCountryAtPoint, pointInGeoJsonFeatureCollection, pointInPolygon } from "./countryLookup";
 
 export const YEARS = [2020, 2021, 2022, 2023, 2024, 2025];
 export { NO2_COLUMN_UNIT, NO2_COLUMN_UNIT_LABEL };
@@ -544,7 +545,7 @@ export function getInterpolatedNo2Cells(filters: Filters, cellSize = INTERPOLATI
       cells.push({
         id: `cell-${round(longitude, 2)}-${round(latitude, 2)}`,
         countryId: "interpolated",
-        countryName: closestNo2SourceName(centroid, sources),
+        countryName: getCountryAtPoint(centroid) ?? "West Africa",
         centroid,
         column,
         polygon: [
@@ -619,61 +620,6 @@ function isInsideInterpolationMask(point: [number, number], filters: Filters, co
   if (!pointInGeoJsonFeatureCollection(point, westAfricaBoundary as any)) return false;
 
   return countries.some((country) => pointInPolygon(point, country.polygon));
-}
-
-function pointInGeoJsonFeatureCollection(point: [number, number], collection: any) {
-  return Boolean(
-    collection.features?.some((feature: any) => {
-      const geometry = feature.geometry;
-      if (!geometry) return false;
-
-      if (geometry.type === "Polygon") {
-        return pointInPolygonWithHoles(point, geometry.coordinates);
-      }
-
-      if (geometry.type === "MultiPolygon") {
-        return geometry.coordinates.some((polygon: [number, number][][]) => pointInPolygonWithHoles(point, polygon));
-      }
-
-      return false;
-    })
-  );
-}
-
-function pointInPolygonWithHoles(point: [number, number], polygon: [number, number][][]) {
-  if (!polygon[0] || !pointInPolygon(point, polygon[0])) return false;
-  return !polygon.slice(1).some((hole) => pointInPolygon(point, hole));
-}
-
-function pointInPolygon(point: [number, number], polygon: [number, number][]) {
-  const [longitude, latitude] = point;
-  let inside = false;
-
-  for (let index = 0, previousIndex = polygon.length - 1; index < polygon.length; previousIndex = index, index += 1) {
-    const [longitudeA, latitudeA] = polygon[index];
-    const [longitudeB, latitudeB] = polygon[previousIndex];
-    const intersects =
-      latitudeA > latitude !== latitudeB > latitude &&
-      longitude < ((longitudeB - longitudeA) * (latitude - latitudeA)) / (latitudeB - latitudeA) + longitudeA;
-
-    if (intersects) inside = !inside;
-  }
-
-  return inside;
-}
-
-function closestNo2SourceName(target: [number, number], sources: InterpolationSource[]) {
-  if (sources.length === 0) return "West Africa interpolation";
-
-  return sources.reduce(
-    (closest, source) => {
-      const longitudeDistance = target[0] - source.coordinates[0];
-      const latitudeDistance = target[1] - source.coordinates[1];
-      const distanceSquared = longitudeDistance * longitudeDistance + latitudeDistance * latitudeDistance;
-      return distanceSquared < closest.distanceSquared ? { label: source.label, distanceSquared } : closest;
-    },
-    { label: "West Africa interpolation", distanceSquared: Number.POSITIVE_INFINITY }
-  ).label;
 }
 
 function interpolateNo2Column(

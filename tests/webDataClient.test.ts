@@ -612,6 +612,38 @@ describe("backend web_data client", () => {
     releaseSlowProbe();
   });
 
+  it("keeps NO2 vector tiles when some probe tiles are empty desert or ocean", async () => {
+    const requests: string[] = [];
+    const fetcher: typeof fetch = async (url) => {
+      const requestUrl = String(url);
+      requests.push(requestUrl);
+      if (requestUrl.endsWith("/api/map/no2/metadata")) return responseFrom(sampleMapMetadata());
+      if (requestUrl.endsWith("/api/map/no2/tiles/Annual/2024/4/7/7.mvt")) return responseFrom(null, { status: 204 });
+      if (requestUrl.includes("/api/map/no2/tiles/Annual/2024/4/")) return responseFrom(null);
+      throw new Error(`Unexpected request ${requestUrl}`);
+    };
+
+    const result = await loadNo2MapData(fetcher, "http://backend.test", "Annual", 2024, { retryDelayMs: 0 });
+
+    expect(result.source).toBe("tile");
+    expect(requests.some((request) => request.includes("/api/map/no2/grid/"))).toBe(false);
+  });
+
+  it("falls back to grid source when every probe tile is empty", async () => {
+    const fetcher: typeof fetch = async (url) => {
+      const requestUrl = String(url);
+      if (requestUrl.endsWith("/api/map/no2/metadata")) return responseFrom(sampleMapMetadata());
+      if (requestUrl.includes("/api/map/no2/tiles/Annual/2024/4/")) return responseFrom(null, { status: 204 });
+      if (requestUrl.endsWith("/api/map/no2/grid/metadata")) return responseFrom(sampleGridMetadata());
+      if (requestUrl.endsWith("/api/map/no2/grid/Annual/2024.json")) return responseFrom(sampleGridFeatureCollection());
+      throw new Error(`Unexpected request ${requestUrl}`);
+    };
+
+    const result = await loadNo2MapData(fetcher, "http://backend.test", "Annual", 2024, { retryDelayMs: 0 });
+
+    expect(result.source).toBe("grid");
+  });
+
   it("stops with the unavailable-map error when the selected map year is unsupported", async () => {
     const requests: string[] = [];
     const fetcher: typeof fetch = async (url) => {
@@ -686,7 +718,6 @@ describe("backend web_data client", () => {
     expect(source).not.toContain("PWE = NO2 x Population, Log Scale");
     expect(source).toContain('layerMode === "population" ? "Population count" : null');
     expect(source).toContain("10<sup>{Math.round(value)}</sup>");
-    expect(source).toContain('"background-color": "#ffffff"');
     expect(source).toContain('opacity: layerMode === "population" ? 0.76 : 0.94');
     expect(source).toContain('opacity: layerMode === "population" ? 0.72 : 0.96');
     expect(source).toContain("getLogExposureColor(Number(properties.log10_pixel_exposure ?? 0), log10ExposureRange, 226)");
@@ -698,7 +729,9 @@ describe("backend web_data client", () => {
     expect(source).not.toContain("getLegendTicks(range, layerMode)");
     expect(source).toContain("DAY_MAP_STYLE");
     expect(source).toContain("NIGHT_MAP_STYLE");
-    expect(source).toContain("tile.openstreetmap.org/{z}/{x}/{y}.png");
+    expect(source).toContain('buildEsriMapStyle("World_Light_Gray", "#ffffff")');
+    expect(source).toContain('buildEsriMapStyle("World_Dark_Gray", "#0b1724")');
+    expect(source).not.toContain("tile.openstreetmap.org");
     expect(source).not.toContain("basemaps.cartocdn.com");
     expect(source).toContain('resolvedTheme === "night" ? NIGHT_MAP_STYLE : DAY_MAP_STYLE');
     expect(source).not.toContain("local-country-context-fill");
@@ -711,7 +744,6 @@ describe("backend web_data client", () => {
     expect(source).not.toContain("interpolateExposureCell");
     expect(source).not.toContain("SUPPLEMENTAL_EXPOSURE_SOURCES");
     expect(source).not.toContain("@/data/sampleData");
-    expect(source).toContain("tile.openstreetmap.org");
     expect(mapExplorerSource).toContain('import dynamic from "next/dynamic";');
     expect(mapExplorerSource).toContain('import type { TargetNpweiMapProps } from "@/components/TargetNpweiMap";');
     expect(mapExplorerSource).toContain('() => import("@/components/TargetNpweiMap").then((module) => module.TargetNpweiMap)');
@@ -738,7 +770,8 @@ describe("backend web_data client", () => {
     expect(skeletonSource).toContain("skeleton-map-legend");
     expect(skeletonSource).not.toContain("skeleton-map-land");
     expect(mapExplorerSource).not.toContain("@/data/sampleData");
-    expect(legacyMapSource).toContain("basemaps.cartocdn.com");
+    expect(legacyMapSource).toContain('buildEsriMapStyle("World_Light_Gray", "#ffffff")');
+    expect(legacyMapSource).not.toContain("basemaps.cartocdn.com");
     expect(legacyMapSource).not.toContain("country-labels");
     expect(legacyMapSource).not.toContain("COUNTRY_LABELS");
   });
@@ -769,28 +802,107 @@ describe("backend web_data client", () => {
     expect(globalStyles).not.toContain("target-selected-year-summary");
   });
 
-  it("derives target map tooltip location labels from current city rows", async () => {
+  it("derives target map tooltip location labels from the country under the cursor", { timeout: 20_000 }, async () => {
     const source = readFileSync(join(process.cwd(), "src", "components", "TargetNpweiMap.tsx"), "utf-8");
 
     expect(source).toContain("function getTooltipHtml(properties: No2TileProperties, metadata: No2MapDisplayMetadata, rows: CityNpweiRow[])");
     expect(source).toContain("const locationLabel = getTooltipLocationLabel(properties, rows)");
     expect(source).toContain("export function getTooltipLocationLabel(properties: No2TileProperties, rows: CityNpweiRow[])");
     expect(source).toContain("if (city && country) return `${city}, ${country}`;");
-    expect(source).toContain("const nearestRow = getNearestCityRow(properties, rows);");
-    expect(source).toContain("return `${nearestRow.name}, ${nearestRow.country}`;");
-    expect(source).toContain("getDistanceFromCityDegrees(lon, lat, row)");
+    expect(source).toContain('return getLocationLabelAtPoint([lon, lat], studyCities) ?? "West Africa grid cell";');
     expect(source).not.toContain("Near ");
-    expect(source.match(/West Africa grid cell/g)).toHaveLength(1);
 
     const { getTooltipLocationLabel } = await import("../src/components/TargetNpweiMap");
-    const lagos = getCityRows("Annual").find((row) => row.name === "Lagos" && row.country === "Nigeria");
-    if (!lagos) throw new Error("Expected Lagos city row in local data");
+    const cityRows = getCityRows("Annual");
+    const lagos = cityRows.find((row) => row.name === "Lagos" && row.country === "Nigeria");
+    const ouagadougou = cityRows.find((row) => row.name === "Ouagadougou" && row.country === "Burkina Faso");
+    if (!lagos || !ouagadougou) throw new Error("Expected Lagos and Ouagadougou city rows in local data");
 
     expect(getTooltipLocationLabel({ city: "Lagos", country: "Nigeria" }, [])).toBe("Lagos, Nigeria");
     expect(getTooltipLocationLabel({ city: "Lagos" }, [])).toBe("Lagos");
     expect(getTooltipLocationLabel({ country: "Nigeria" }, [])).toBe("Nigeria");
     expect(getTooltipLocationLabel({ lat: lagos.lat + 0.02, lon: lagos.lon - 0.02 }, [lagos])).toBe("Lagos, Nigeria");
+    expect(getTooltipLocationLabel({ lat: ouagadougou.lat, lon: ouagadougou.lon }, cityRows)).toBe("Ouagadougou, Burkina Faso");
     expect(getTooltipLocationLabel({}, [lagos])).toBe("West Africa grid cell");
+    expect(getTooltipLocationLabel({ lon: -10, lat: 3 }, cityRows)).toBe("West Africa grid cell");
+  });
+
+  it("names a town in the country under the cursor, never one across a border", async () => {
+    const { getTooltipLocationLabel } = await import("../src/components/TargetNpweiMap");
+    const { getCountryAtPoint } = await import("../src/data/countryLookup");
+    const cityRows = getCityRows("Annual");
+    const interiorPoints: Array<[string, [number, number]]> = [
+      ["Senegal", [-16.93, 14.79]],
+      ["Gambia", [-15.5, 13.45]],
+      ["Guinea-Bissau", [-14.66, 12.17]],
+      ["Guinea", [-9.3, 10.38]],
+      ["Sierra Leone", [-11.74, 7.96]],
+      ["Liberia", [-9.47, 7.0]],
+      ["Côte d'Ivoire", [-5.28, 6.82]],
+      ["Ghana", [-1.62, 6.69]],
+      ["Togo", [1.13, 7.53]],
+      ["Benin", [2.63, 9.34]],
+      ["Nigeria", [7.49, 9.06]],
+      ["Niger", [2.11, 13.51]],
+      ["Burkina Faso", [-1.53, 12.37]],
+      ["Mali", [-8.0, 12.64]],
+      ["Mauritania", [-13.05, 20.52]]
+    ];
+    const borderPoints: Array<[string, [number, number]]> = [
+      ["Senegal", [-15.5, 13.9]],
+      ["Gambia", [-15.5, 13.45]],
+      ["Ghana", [0.0, 8.0]],
+      ["Togo", [1.0, 8.0]],
+      ["Benin", [2.3, 9.0]],
+      ["Nigeria", [3.5, 9.0]],
+      ["Burkina Faso", [-1.5, 14.0]],
+      ["Mali", [-1.5, 15.5]]
+    ];
+
+    for (const [country, [lon, lat]] of [...interiorPoints, ...borderPoints]) {
+      expect(getCountryAtPoint([lon, lat])).toBe(country);
+      const label = getTooltipLocationLabel({ lon, lat }, cityRows);
+      expect(label === country || label.endsWith(`, ${country}`)).toBe(true);
+      const foreignRows = cityRows.filter((row) => row.country !== country);
+      const foreignLabel = getTooltipLocationLabel({ lon, lat }, foreignRows);
+      expect(foreignLabel === country || foreignLabel.endsWith(`, ${country}`)).toBe(true);
+    }
+
+    // Interior points sit next to real towns, so the hover names a city rather than just the country.
+    for (const [country, [lon, lat]] of interiorPoints) {
+      expect(getTooltipLocationLabel({ lon, lat }, cityRows)).toMatch(new RegExp(`^.+, ${country}$`));
+    }
+    expect(getTooltipLocationLabel({ lon: -16.93, lat: 14.79 }, [])).toBe("Thiès, Senegal");
+    expect(getTooltipLocationLabel({ lon: -1.62, lat: 6.69 }, [])).toBe("Kumasi, Ghana");
+    expect(getTooltipLocationLabel({ lon: 8.52, lat: 12.0 }, [])).toBe("Kano, Nigeria");
+    // Remote desert with no town nearby falls back to the country.
+    expect(getTooltipLocationLabel({ lon: -8.0, lat: 22.0 }, [])).toBe("Mauritania");
+    // Study cities win over nearby GeoNames neighbourhoods.
+    expect(getTooltipLocationLabel({ lon: 3.4, lat: 6.5 }, cityRows)).toBe("Lagos, Nigeria");
+    // Coastal cells just outside the simplified country outlines still get a town name.
+    expect(getTooltipLocationLabel({ lon: -16.6, lat: 13.45 }, cityRows)).toBe("Banjul, Gambia");
+    expect(getTooltipLocationLabel({ lon: -10.8, lat: 6.3 }, cityRows)).toBe("Monrovia, Liberia");
+  });
+
+  it("labels interpolated overview NO2 cells with the country that contains them", async () => {
+    const { getCountryAtPoint } = await import("../src/data/countryLookup");
+    const { getInterpolatedNo2Cells, INTERPOLATION_CELL_DEGREES } = await import("../src/data/sampleData");
+    const surface = getInterpolatedNo2Cells(
+      { countryId: "all", regionId: "west-africa", cityId: "all", year: 2024, month: 1, season: "Annual" } as any,
+      INTERPOLATION_CELL_DEGREES * 4
+    );
+    const countries = new Set<string>();
+
+    expect(surface.features.length).toBeGreaterThan(0);
+    for (const feature of surface.features) {
+      const ring = feature.geometry.coordinates[0];
+      const centroid: [number, number] = [(ring[0][0] + ring[2][0]) / 2, (ring[0][1] + ring[2][1]) / 2];
+      const expected = getCountryAtPoint(centroid) ?? "West Africa";
+      expect(feature.properties.countryName).toBe(expected);
+      countries.add(feature.properties.countryName);
+    }
+    expect(countries.has("Senegal")).toBe(true);
+    expect(countries.has("Burkina Faso")).toBe(true);
   });
 
   it("enables SDF font rendering for remaining outlined map text labels", () => {

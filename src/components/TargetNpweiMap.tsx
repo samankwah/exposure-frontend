@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { WebMercatorViewport } from "@deck.gl/core";
 import DeckGL from "@deck.gl/react";
 import { GeoJsonLayer } from "@deck.gl/layers";
 import { MVTLayer } from "@deck.gl/geo-layers";
@@ -10,6 +11,8 @@ import { Minus, Plus } from "lucide-react";
 import { MapPanelSkeleton } from "@/components/Skeletons";
 import { useTheme } from "@/components/ThemeProvider";
 import westAfricaBoundary from "@/data/westAfricaBoundary.json";
+import { getCountryAtPoint, getLocationLabelAtPoint } from "@/data/countryLookup";
+import { buildEsriMapStyle } from "@/data/esriBasemap";
 import {
   buildNo2TileUrlTemplate,
   getApiBaseUrl,
@@ -23,77 +26,8 @@ import {
 } from "@/data/webDataClient";
 import { NO2_COLUMN_UNIT_LABEL, pweToColumn, type CityNpweiRow, type WebDataSeason } from "@/data/webData";
 
-const DAY_MAP_STYLE = {
-  version: 8,
-  sources: {
-    "osm-light": {
-      type: "raster",
-      tiles: [
-        "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      ],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors"
-    }
-  },
-  layers: [
-    {
-      id: "local-background",
-      type: "background",
-      paint: {
-        "background-color": "#ffffff"
-      }
-    },
-    {
-      id: "osm-light",
-      type: "raster",
-      source: "osm-light",
-      paint: {
-        "raster-opacity": 0.94,
-        "raster-saturation": -0.2
-      }
-    }
-  ]
-} as const;
-
-const NIGHT_MAP_STYLE = {
-  version: 8,
-  sources: {
-    "osm-dark": {
-      type: "raster",
-      tiles: [
-        "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      ],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors"
-    }
-  },
-  layers: [
-    {
-      id: "local-background",
-      type: "background",
-      paint: {
-        "background-color": "#0b1724"
-      }
-    },
-    {
-      id: "osm-dark",
-      type: "raster",
-      source: "osm-dark",
-      paint: {
-        "raster-opacity": 0.9,
-        "raster-saturation": -0.5,
-        "raster-brightness-max": 0.45,
-        "raster-contrast": 0.15
-      }
-    }
-  ]
-} as const;
+const DAY_MAP_STYLE = buildEsriMapStyle("World_Light_Gray", "#ffffff");
+const NIGHT_MAP_STYLE = buildEsriMapStyle("World_Dark_Gray", "#0b1724");
 
 const INITIAL_VIEW_STATE = {
   longitude: -1.35,
@@ -106,6 +40,35 @@ const INITIAL_VIEW_STATE = {
 };
 
 type MapViewState = typeof INITIAL_VIEW_STATE;
+type MapInteractionState = {
+  isDragging?: boolean;
+  isPanning?: boolean;
+  isZooming?: boolean;
+  isRotating?: boolean;
+};
+
+// Populated West Africa: Senegal/Mauritania coast to eastern Nigeria, Gulf of
+// Guinea to the southern Sahel. Fitted to the panel size when the map opens.
+const INITIAL_MAP_BOUNDS: [[number, number], [number, number]] = [
+  [-17.6, 4.2],
+  [15.0, 17.2]
+];
+const INITIAL_MAP_PADDING_PX = 12;
+// Opens slightly wider than a tight fit so the region has some breathing room.
+const INITIAL_MAP_ZOOM_OUT = 0.25;
+
+function getFittedInitialViewState(width: number, height: number): MapViewState {
+  const { longitude, latitude, zoom } = new WebMercatorViewport({ width, height }).fitBounds(INITIAL_MAP_BOUNDS, {
+    padding: Math.min(INITIAL_MAP_PADDING_PX, Math.floor(Math.min(width, height) / 4))
+  });
+
+  return {
+    ...INITIAL_VIEW_STATE,
+    longitude,
+    latitude,
+    zoom: Math.min(INITIAL_VIEW_STATE.maxZoom, Math.max(INITIAL_VIEW_STATE.minZoom, zoom - INITIAL_MAP_ZOOM_OUT))
+  };
+}
 export type TargetMapLayerMode = "no2" | "population";
 type No2MapDisplayMetadata = No2MapTileMetadata | No2MapGridMetadata;
 type MapDataState =
@@ -156,6 +119,13 @@ export function TargetNpweiMap({
   const [isClient, setIsClient] = useState(false);
   const [mapDataState, setMapDataState] = useState<MapDataState>({ status: "loading" });
   const [viewState, setViewState] = useState<MapViewState>(INITIAL_VIEW_STATE);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const userMovedMapRef = useRef(false);
+  const hasFittedInitialViewRef = useRef(false);
+  // DeckGL mounts only after the first fit, so it never starts from (and then
+  // reports back) the unfitted default view.
+  const [hasInitialFit, setHasInitialFit] = useState(false);
+  const isMapPanelMounted = isClient && mapDataState.status === "ready";
   const apiBaseUrl = getApiBaseUrl();
   const mapStyle = resolvedTheme === "night" ? NIGHT_MAP_STYLE : DAY_MAP_STYLE;
 
@@ -228,7 +198,38 @@ export function TargetNpweiMap({
         isVisibleFeature(properties, visibleFeatureKeys, rows, filterActive)
     );
   }, [filterActive, layerMode, rows, visibleFeatureKeys, westAfricaGridData]);
-  const updateViewState = (nextViewState: Partial<MapViewState>) => {
+  // Keep the opening view framed on the panel until the user pans or zooms.
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!isMapPanelMounted || !panel) return;
+
+    const fitToPanel = () => {
+      // The first fit always applies; later resizes only refit an untouched map.
+      if (hasFittedInitialViewRef.current && userMovedMapRef.current) return;
+      const { width, height } = panel.getBoundingClientRect();
+      if (width <= 0 || height <= 0) return;
+      hasFittedInitialViewRef.current = true;
+      setViewState(getFittedInitialViewState(width, height));
+      setHasInitialFit(true);
+    };
+
+    fitToPanel();
+    const observer = new ResizeObserver(fitToPanel);
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [isMapPanelMounted]);
+
+  const updateViewState = (nextViewState: Partial<MapViewState>, interactionState?: MapInteractionState) => {
+    // deck.gl also reports view changes while it initialises; only real gestures
+    // should stop the opening view from refitting to the panel.
+    if (
+      interactionState?.isDragging ||
+      interactionState?.isPanning ||
+      interactionState?.isZooming ||
+      interactionState?.isRotating
+    ) {
+      userMovedMapRef.current = true;
+    }
     setViewState({
       ...INITIAL_VIEW_STATE,
       ...nextViewState,
@@ -240,6 +241,7 @@ export function TargetNpweiMap({
   };
 
   const zoomMap = (step: number) => {
+    userMovedMapRef.current = true;
     setViewState((current) => ({
       ...current,
       zoom: Math.min(INITIAL_VIEW_STATE.maxZoom, Math.max(INITIAL_VIEW_STATE.minZoom, current.zoom + step))
@@ -271,6 +273,9 @@ export function TargetNpweiMap({
           id: `no2-pixel-tiles-${season}-${year}-${layerMode}`,
           data: buildNo2TileUrlTemplate(mapDataState.metadata, season, year, apiBaseUrl),
           minZoom: mapDataState.metadata.minzoom,
+          // With an extent, deck.gl keeps drawing the minzoom tiles when zoomed
+          // out past minzoom instead of hiding the layer until the user zooms in.
+          extent: mapDataState.metadata.bounds,
           maxZoom: mapDataState.metadata.maxzoom,
           pickable: true,
           filled: true,
@@ -359,31 +364,33 @@ export function TargetNpweiMap({
   ];
 
   return (
-    <div className="map-panel target-npwei-map-panel">
-      <DeckGL
-        controller
-        getCursor={({ isDragging, isHovering }) => (isDragging ? "grabbing" : isHovering ? "pointer" : "grab")}
-        getTooltip={({ object }) => {
-          const properties = (object as DeckFeature | null)?.properties;
-          if (!properties || !isVisibleFeature(properties, visibleFeatureKeys, rows, filterActive)) return null;
-          if (mapDataState.source !== "grid" && !isInsideWestAfricaBoundary(properties)) return null;
-          if (layerMode === "no2" && !isAffectedPweFeature(properties)) return null;
-          if (layerMode === "population" && !isPopulationFeature(properties)) return null;
-          return {
-            html: getTooltipHtml(properties, metadata, rows),
-            className: "target-map-tooltip"
-          };
-        }}
-        layers={layers}
-        onViewStateChange={({ viewState: nextViewState }) => {
-          updateViewState(nextViewState as Partial<MapViewState>);
-        }}
-        viewState={viewState}
-      >
-        <MapLibreMap mapLib={maplibregl as any} mapStyle={mapStyle as any} reuseMaps>
-          <ScaleControl position="bottom-left" />
-        </MapLibreMap>
-      </DeckGL>
+    <div className="map-panel target-npwei-map-panel" ref={panelRef}>
+      {hasInitialFit ? (
+        <DeckGL
+          controller
+          getCursor={({ isDragging, isHovering }) => (isDragging ? "grabbing" : isHovering ? "pointer" : "grab")}
+          getTooltip={({ object }) => {
+            const properties = (object as DeckFeature | null)?.properties;
+            if (!properties || !isVisibleFeature(properties, visibleFeatureKeys, rows, filterActive)) return null;
+            if (mapDataState.source !== "grid" && !isInsideWestAfricaBoundary(properties)) return null;
+            if (layerMode === "no2" && !isAffectedPweFeature(properties)) return null;
+            if (layerMode === "population" && !isPopulationFeature(properties)) return null;
+            return {
+              html: getTooltipHtml(properties, metadata, rows),
+              className: "target-map-tooltip"
+            };
+          }}
+          layers={layers}
+          onViewStateChange={({ viewState: nextViewState, interactionState }) => {
+            updateViewState(nextViewState as Partial<MapViewState>, interactionState);
+          }}
+          viewState={viewState}
+        >
+          <MapLibreMap mapLib={maplibregl as any} mapStyle={mapStyle as any} reuseMaps>
+            <ScaleControl position="bottom-left" />
+          </MapLibreMap>
+        </DeckGL>
+      ) : null}
       <div className="map-zoom-controls" aria-label="Map zoom controls">
         <button type="button" aria-label="Zoom in" onClick={() => zoomMap(0.5)}>
           <Plus size={17} aria-hidden />
@@ -537,51 +544,8 @@ function isInsideWestAfricaBoundary(properties: Partial<No2TileProperties> | Rec
   const lat = Number(properties.lat);
   if (!Number.isFinite(lon) || !Number.isFinite(lat)) return false;
 
-  return pointInGeoJsonFeatureCollection([lon, lat], westAfricaBoundary as any);
-}
-
-function pointInGeoJsonFeatureCollection(point: [number, number], collection: any) {
-  return Boolean(
-    collection.features?.some((feature: any) => {
-      const geometry = feature.geometry;
-      if (!geometry) return false;
-
-      if (geometry.type === "Polygon") {
-        return pointInPolygonWithHoles(point, geometry.coordinates);
-      }
-
-      if (geometry.type === "MultiPolygon") {
-        return geometry.coordinates.some((polygon: [number, number][][]) => pointInPolygonWithHoles(point, polygon));
-      }
-
-      return false;
-    })
-  );
-}
-
-function pointInPolygonWithHoles(point: [number, number], polygon: [number, number][][]) {
-  if (!polygon[0] || !pointInPolygon(point, polygon[0])) return false;
-  return !polygon.slice(1).some((hole) => pointInPolygon(point, hole));
-}
-
-function pointInPolygon(point: [number, number], polygon: [number, number][]) {
-  const [longitude, latitude] = point;
-  let inside = false;
-
-  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
-    const [currentLongitude, currentLatitude] = polygon[index];
-    const [previousLongitude, previousLatitude] = polygon[previous];
-    const intersects =
-      currentLatitude > latitude !== previousLatitude > latitude &&
-      longitude <
-        ((previousLongitude - currentLongitude) * (latitude - currentLatitude)) /
-          (previousLatitude - currentLatitude) +
-          currentLongitude;
-
-    if (intersects) inside = !inside;
-  }
-
-  return inside;
+  // Cached and bounding-box pruned, so per-feature colour checks stay cheap.
+  return getCountryAtPoint([lon, lat]) !== null;
 }
 
 function getTooltipHtml(properties: No2TileProperties, metadata: No2MapDisplayMetadata, rows: CityNpweiRow[]) {
@@ -612,29 +576,14 @@ export function getTooltipLocationLabel(properties: No2TileProperties, rows: Cit
   if (city) return city;
   if (country) return country;
 
-  const nearestRow = getNearestCityRow(properties, rows);
-  if (nearestRow) return `${nearestRow.name}, ${nearestRow.country}`;
-
-  return "West Africa grid cell";
-}
-
-function getNearestCityRow(properties: No2TileProperties, rows: CityNpweiRow[]): CityNpweiRow | null {
   const lon = Number(properties.lon);
   const lat = Number(properties.lat);
-  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return null;
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return "West Africa grid cell";
 
-  let nearestRow: CityNpweiRow | null = null;
-  let nearestDistance = Number.POSITIVE_INFINITY;
-
-  for (const row of rows) {
-    const distance = getDistanceFromCityDegrees(lon, lat, row);
-    if (distance < nearestDistance) {
-      nearestDistance = distance;
-      nearestRow = row;
-    }
-  }
-
-  return nearestRow;
+  // Grid cells carry no names, so name the nearest town inside the country under
+  // the cursor (study cities included), falling back to the country itself.
+  const studyCities = rows.map((row) => ({ name: row.name, country: row.country, lon: row.lon, lat: row.lat }));
+  return getLocationLabelAtPoint([lon, lat], studyCities) ?? "West Africa grid cell";
 }
 
 function renderTooltipRow(label: string, valueHtml: string) {
